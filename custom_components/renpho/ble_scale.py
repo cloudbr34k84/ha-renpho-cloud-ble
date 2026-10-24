@@ -34,6 +34,7 @@ from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
@@ -51,12 +52,14 @@ from .const import (
     CONF_NAME,
     CONF_PROFILE_BYTE,
     CONF_SEX,
+    CONF_SOURCE,
     CONF_START_WEIGHT,
     CONF_TOLERANCE,
     DEFAULT_TOLERANCE_KG,
     DOMAIN,
     SEX_FEMALE,
     SIGNAL_BLE_UPDATE,
+    SOURCE_CLOUD,
     SUBENTRY_PROFILE,
 )
 
@@ -70,6 +73,12 @@ MIN_WEIGHT = 10.0
 DUPLICATE_WINDOW = timedelta(minutes=2)
 ADV_NOTIFY_INTERVAL = timedelta(seconds=5)
 STORE_VERSION = 1
+# The scale only advertises while awake; after this long unseen, the next
+# advert is a new wake-up (someone stepping on)
+WAKE_GAP = timedelta(minutes=5)
+# Cloud checks after a wake-up: the Renpho app syncs the reading within a minute
+# or two when the phone takes the weigh-in; the second check catches slow syncs
+CLOUD_REFRESH_AFTER_WAKE = (90, 300)
 MSC_RECORD_HOLD = 30.0  # s after the final weight to wait for the 0x25 record
 MSC_RECORD_WEIGHT_TOL = 0.5  # kg between the final weight and the record's
 MSC_BMI_TOLERANCE = 0.1 + 1e-9  # record BMI vs weight / sent height², 0.1 rounding
@@ -107,6 +116,7 @@ class RenphoBleScale:
         self._cooldown_until: datetime = dt_util.utcnow()
         self._last_adv_notify: datetime = datetime.min.replace(tzinfo=dt_util.UTC)
         self._unsub: list = []
+        self._cloud_timers: list = []
         # per-session state
         self._buffers: dict[str, bytearray] = {}
         self._done = asyncio.Event()
@@ -160,6 +170,7 @@ class RenphoBleScale:
         )
 
     async def async_stop(self) -> None:
+        self._cancel_cloud_timers()
         for unsub in self._unsub:
             unsub()
         self._unsub.clear()
@@ -194,6 +205,8 @@ class RenphoBleScale:
                     )
                 self.advert = advert
         now = dt_util.utcnow()
+        if self.last_seen is None or now - self.last_seen > WAKE_GAP:
+            self._refresh_cloud_soon()
         self.rssi = info.rssi
         self.last_seen = now
         self.source = info.source
@@ -205,6 +218,23 @@ class RenphoBleScale:
             return
         self._last_adv_notify = now
         self._notify()
+
+    @callback
+    def _refresh_cloud_soon(self) -> None:
+        """Someone just stepped on the scale: check the Renpho cloud shortly after."""
+        self._cancel_cloud_timers()
+        self._cloud_timers = [async_call_later(self.hass, d, self._refresh_cloud) for d in CLOUD_REFRESH_AFTER_WAKE]
+
+    def _cancel_cloud_timers(self) -> None:
+        for cancel in self._cloud_timers:
+            cancel()
+        self._cloud_timers = []
+
+    @callback
+    def _refresh_cloud(self, _now: datetime) -> None:
+        for entry in self.hass.config_entries.async_loaded_entries(DOMAIN):
+            if entry.data.get(CONF_SOURCE) == SOURCE_CLOUD:
+                self.hass.async_create_task(entry.runtime_data.async_request_refresh())
 
     # -------------------------------------------------------------- session
     def _reset_session(self) -> None:

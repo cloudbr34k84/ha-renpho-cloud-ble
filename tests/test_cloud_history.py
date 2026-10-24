@@ -38,6 +38,8 @@ def morphoscan(ts: int, weight: float, uid: str = "1001") -> dict:
         "bmr": 1700, "visfat": 12.0, "subfat": 22.0, "protein": 14.0, "bodyage": 40, "sinew": 55.0,
         "fatFreeWeight": 60.0, "sinewRatio": 58.0, "resistance": True,
         "weightMin": 60.0, "weightMax": 80.0, "weightStd": 70.0, "bfpMin": 10.0, "bfpMax": 20.0, "bfpStd": 15.0,
+        "bmrMin": 1500, "bmrMax": 1800, "bmrStd": 1650, "waterMassMin": 38.0, "waterMassMax": 47.0,
+        "proteinMassMin": 10.0, "proteinMassMax": 13.0, "muscleMassMin": 45.0, "muscleMassMax": 58.0,
         "bfmMin": 8.0, "bfmMax": 16.0, "bfmStd": 10.0, "boneMin": 3.4, "boneMax": 4.2,
         "smmMass": 33.0, "smmMin": 28.0, "smmMax": 35.0, "smmStd": 31.0, "smi": 8.5,
         "bodyScore": 70.0, "bodyType": 5, "whr": 0.95, "obesityDegree": 120,

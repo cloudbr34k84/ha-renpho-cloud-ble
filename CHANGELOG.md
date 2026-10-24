@@ -8,6 +8,9 @@ All notable changes to the Renpho (Cloud + Bluetooth) Home Assistant integration
 
 ### Added
 - **Cloud body-composition-analyser sensors** (8-electrode / MorphoScan accounts): segmental fat and muscle mass for each arm, each leg and the trunk (kg, and % of standard), skeletal muscle mass/index, body score, body type, waist-hip ratio, obesity degree, target weight and weight/fat/muscle control, segment impedances (disabled by default), and healthy-range attributes. Created only for people whose records carry them.
+- **Cloud status sensors** (low / normal / high against Renpho's own healthy ranges) for weight, body fat, body fat mass, muscle mass, skeletal muscle mass, bone mass, BMR, body water and protein.
+- **Measurement event entity** per cloud person: fires once per new weigh-in (none on startup, catches up after downtime).
+- **Scale wake-up refreshes the cloud** (checks ~1½ and 5 minutes after the Bluetooth scale wakes), so the app-synced analysis arrives within minutes.
 - **Cloud goal sensors** from the account profile (weight goal, weight to goal, goal date, body fat goal, starting weight/body fat, waist, hip; created once set in the app) and **muscle mass percentage**.
 - **Cloud history import** into long-term statistics (hourly mean/min/max at each measurement's own time). A one-off full backfill per sensor, then incremental; `renpho.import_history` re-imports.
 - Cloud now reads and merges both record stores (classic and body composition), attributes records by `bUserId`, and skips records flagged invalid.

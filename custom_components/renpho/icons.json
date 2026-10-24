@@ -204,6 +204,74 @@
       },
       "hip": {
         "default": "mdi:tape-measure"
+      },
+      "weight_status": {
+        "default": "mdi:check-circle-outline",
+        "state": {
+          "low": "mdi:arrow-down-circle-outline",
+          "high": "mdi:arrow-up-circle-outline"
+        }
+      },
+      "body_fat_status": {
+        "default": "mdi:check-circle-outline",
+        "state": {
+          "low": "mdi:arrow-down-circle-outline",
+          "high": "mdi:arrow-up-circle-outline"
+        }
+      },
+      "body_fat_mass_status": {
+        "default": "mdi:check-circle-outline",
+        "state": {
+          "low": "mdi:arrow-down-circle-outline",
+          "high": "mdi:arrow-up-circle-outline"
+        }
+      },
+      "muscle_mass_status": {
+        "default": "mdi:check-circle-outline",
+        "state": {
+          "low": "mdi:arrow-down-circle-outline",
+          "high": "mdi:arrow-up-circle-outline"
+        }
+      },
+      "skeletal_muscle_mass_status": {
+        "default": "mdi:check-circle-outline",
+        "state": {
+          "low": "mdi:arrow-down-circle-outline",
+          "high": "mdi:arrow-up-circle-outline"
+        }
+      },
+      "bone_mass_status": {
+        "default": "mdi:check-circle-outline",
+        "state": {
+          "low": "mdi:arrow-down-circle-outline",
+          "high": "mdi:arrow-up-circle-outline"
+        }
+      },
+      "bmr_status": {
+        "default": "mdi:check-circle-outline",
+        "state": {
+          "low": "mdi:arrow-down-circle-outline",
+          "high": "mdi:arrow-up-circle-outline"
+        }
+      },
+      "body_water_status": {
+        "default": "mdi:check-circle-outline",
+        "state": {
+          "low": "mdi:arrow-down-circle-outline",
+          "high": "mdi:arrow-up-circle-outline"
+        }
+      },
+      "protein_status": {
+        "default": "mdi:check-circle-outline",
+        "state": {
+          "low": "mdi:arrow-down-circle-outline",
+          "high": "mdi:arrow-up-circle-outline"
+        }
+      }
+    },
+    "event": {
+      "measurement": {
+        "default": "mdi:scale-bathroom"
       }
     }
   },

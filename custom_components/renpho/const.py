@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 DOMAIN: Final = "renpho"
-PLATFORMS: Final = ["sensor"]
+PLATFORMS: Final = ["event", "sensor"]
 
 # Entry types
 CONF_SOURCE: Final = "source"

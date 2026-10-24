@@ -101,6 +101,12 @@ People weighed on a body-composition analyser (8-electrode, e.g. R-MSC04/R-MSC06
 - **Impedance:** 20 kHz and 100 kHz per segment, disabled by default.
 - **Muscle mass percentage.**
 
+**Status:** low / normal / high for weight, body fat, body fat mass, muscle mass, skeletal muscle mass, bone mass, BMR, body water and protein. Each is judged against the healthy range Renpho sends with the reading (water and protein as kg of body weight, which is how Renpho states those ranges), and appears only when that range is present.
+
+**Measurement event:** each cloud person has an `event.renpho_cloud_<name>_measurement` entity. It fires once for every new weigh-in, with weight, body fat, BMI and the other headline numbers as attributes, so automations can trigger on the event itself. Readings already in the account when Home Assistant starts don't fire. Weigh-ins made while Home Assistant was down fire once it's back.
+
+**Faster updates after a weigh-in:** if a Renpho Bluetooth scale is also set up, waking it up (stepping on it) triggers cloud checks about 1½ and 5 minutes later. Cloud data then arrives within minutes, without waiting for the polling interval.
+
 **Goals:** from each account's profile in the Renpho Health app: weight goal, weight to goal (latest weight minus goal), goal date, body fat goal, starting weight and body fat, waist and hip. Each sensor appears once that value is set in the app. Values are converted to kg and cm if the app stores lb or inches.
 
 **History:** every cloud measurement is written into the matching sensors' long-term statistics at the time it was taken. The graphs therefore go back as far as the Renpho account does, and weigh-ins between two polls aren't lost. The first time a sensor is seen, its full history is imported once; after that only new measurements are added. To re-import everything, call `renpho.import_history` for the cloud entry. This needs the recorder (part of the default config).
@@ -178,4 +184,4 @@ Built on the work of these projects:
 - [ronnnnnnnnnnnnn/renpho_fitness_scale_ble](https://github.com/ronnnnnnnnnnnnn/renpho_fitness_scale_ble) and [renpho-escs20m](https://pypi.org/project/renpho-escs20m/): the 0x55aa protocol, captures and body-composition formulas.
 - [KristianP26/ble-scale-sync](https://github.com/KristianP26/ble-scale-sync): the MorphoScan (R-MSC04) protocol, worked out with its users from real captures. That project is GPL-3.0, so only the documented wire facts are used here; no code is copied.
 
-This project is MIT-licensed (see [LICENSE](LICENSE)). Not affiliated with or endorsed by Renpho.
+This project is MIT-licensed (see [LICENSE](LICENSE)); the upstream projects' notices are in [NOTICE](NOTICE). Not affiliated with or endorsed by Renpho.

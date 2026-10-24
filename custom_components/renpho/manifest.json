@@ -11,6 +11,9 @@
       "manufacturer_id": 6672
     }
   ],
+  "categories": [
+    "health_wellbeing"
+  ],
   "codeowners": [
     "@cloudbr34k84"
   ],

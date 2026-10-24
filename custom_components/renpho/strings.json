@@ -365,6 +365,90 @@
       },
       "hip": {
         "name": "Hip"
+      },
+      "weight_status": {
+        "name": "Weight status",
+        "state": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High"
+        }
+      },
+      "body_fat_status": {
+        "name": "Body fat status",
+        "state": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High"
+        }
+      },
+      "body_fat_mass_status": {
+        "name": "Body fat mass status",
+        "state": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High"
+        }
+      },
+      "muscle_mass_status": {
+        "name": "Muscle mass status",
+        "state": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High"
+        }
+      },
+      "skeletal_muscle_mass_status": {
+        "name": "Skeletal muscle mass status",
+        "state": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High"
+        }
+      },
+      "bone_mass_status": {
+        "name": "Bone mass status",
+        "state": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High"
+        }
+      },
+      "bmr_status": {
+        "name": "Basal metabolic rate status",
+        "state": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High"
+        }
+      },
+      "body_water_status": {
+        "name": "Body water status",
+        "state": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High"
+        }
+      },
+      "protein_status": {
+        "name": "Protein status",
+        "state": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High"
+        }
+      }
+    },
+    "event": {
+      "measurement": {
+        "name": "Measurement",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "measurement": "New measurement"
+            }
+          }
+        }
       }
     }
   },

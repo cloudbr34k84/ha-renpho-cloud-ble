@@ -169,6 +169,57 @@ MORPHOSCAN_SENSORS: tuple[RenphoSensorDescription, ...] = (
     ),
 )
 
+STATUS_OPTIONS = ["low", "normal", "high"]
+
+
+def _num(d: dict[str, Any], key: str) -> float | None:
+    v = d.get(key)
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def _status(value_fn: Callable[[dict[str, Any]], float | None], low_key: str, high_key: str) -> Callable[[dict[str, Any]], str | None]:
+    """Where a metric sits against the healthy range Renpho sends with the record."""
+
+    def fn(d: dict[str, Any]) -> str | None:
+        value, low, high = value_fn(d), _num(d, low_key), _num(d, high_key)
+        if value is None or low is None or high is None or not 0 < low <= high:
+            return None
+        return "low" if value < low else "high" if value > high else "normal"
+
+    return fn
+
+
+def _mass_of(pct_key: str) -> Callable[[dict[str, Any]], float | None]:
+    """A percentage field as kg of body weight (water and protein ranges are in kg)."""
+
+    def fn(d: dict[str, Any]) -> float | None:
+        pct, weight = _num(d, pct_key), _num(d, "weight")
+        return pct * weight / 100 if pct and weight else None
+
+    return fn
+
+
+def _status_desc(key: str, value_fn, low_key: str, high_key: str) -> RenphoSensorDescription:
+    return RenphoSensorDescription(
+        key=key, translation_key=key, device_class=SensorDeviceClass.ENUM, options=STATUS_OPTIONS,
+        value_fn=_status(value_fn, low_key, high_key), optional=True, history=False,
+    )
+
+
+# Low / normal / high against the record's own healthy ranges. BMI is left
+# out: its range fields hold category cut-offs, not a healthy range.
+STATUS_SENSORS: tuple[RenphoSensorDescription, ...] = (
+    _status_desc("weight_status", lambda d: _num(d, "weight"), "weightMin", "weightMax"),
+    _status_desc("body_fat_status", lambda d: _num(d, "bodyfat"), "bfpMin", "bfpMax"),
+    _status_desc("body_fat_mass_status", _fat_mass, "bfmMin", "bfmMax"),
+    _status_desc("muscle_mass_status", lambda d: _num(d, "sinew"), "muscleMassMin", "muscleMassMax"),
+    _status_desc("skeletal_muscle_mass_status", lambda d: _num(d, "smmMass"), "smmMin", "smmMax"),
+    _status_desc("bone_mass_status", lambda d: _num(d, "bone"), "boneMin", "boneMax"),
+    _status_desc("bmr_status", lambda d: _num(d, "bmr"), "bmrMin", "bmrMax"),
+    _status_desc("body_water_status", _mass_of("water"), "waterMassMin", "waterMassMax"),
+    _status_desc("protein_status", _mass_of("protein"), "proteinMassMin", "proteinMassMax"),
+)
+
 # Goals and body measurements from each account's profile (set in the Renpho
 # app; created once set). Normalised to kg / cm by cloud_api.profile_goals.
 CM = UnitOfLength.CENTIMETERS
@@ -187,7 +238,7 @@ GOAL_SENSORS: tuple[RenphoSensorDescription, ...] = (
     _d("hip", CM, SensorDeviceClass.DISTANCE, optional=True, from_profile=True, history=False),
 )
 
-ALL_CLOUD_SENSORS = CLOUD_SENSORS + MORPHOSCAN_SENSORS + GOAL_SENSORS
+ALL_CLOUD_SENSORS = CLOUD_SENSORS + MORPHOSCAN_SENSORS + STATUS_SENSORS + GOAL_SENSORS
 # Keys of entities earlier versions created that no longer exist
 RETIRED_CLOUD_KEYS = ("bone_percent",)
 # Created unconditionally by earlier versions; removed where the data is absent
@@ -284,6 +335,17 @@ def cloud_unique_id(entry: RenphoConfigEntry, uid: str, key: str) -> str:
     return f"{cloud_scope(entry)}_{uid}_{key}"
 
 
+def cloud_device_info(coordinator: RenphoCloudCoordinator, uid: str) -> DeviceInfo:
+    """The person's device; every platform describes it in full (any may create it)."""
+    name = (coordinator.data or {}).get("users", {}).get(uid, uid)
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{cloud_scope(coordinator.config_entry)}_{uid}")},
+        name=f"Renpho Cloud {name}",
+        manufacturer="Renpho",
+        model="Renpho Health account",
+    )
+
+
 class RenphoCloudSensor(CoordinatorEntity[RenphoCloudCoordinator], SensorEntity):
     _attr_has_entity_name = True
     entity_description: RenphoSensorDescription
@@ -292,15 +354,8 @@ class RenphoCloudSensor(CoordinatorEntity[RenphoCloudCoordinator], SensorEntity)
         super().__init__(coordinator)
         self.entity_description = desc
         self._uid = uid
-        scope = cloud_scope(coordinator.config_entry)
         self._attr_unique_id = cloud_unique_id(coordinator.config_entry, uid, desc.key)
-        name = coordinator.data["users"].get(uid, uid)
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{scope}_{uid}")},
-            name=f"Renpho Cloud {name}",
-            manufacturer="Renpho",
-            model="Renpho Health account",
-        )
+        self._attr_device_info = cloud_device_info(coordinator, uid)
 
     @property
     def _record(self) -> dict[str, Any]:

@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+# Diagnostics downloads from a live system — keep out of the public repo
+config_entry-*.json

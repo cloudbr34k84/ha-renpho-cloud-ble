@@ -1,0 +1,218 @@
+{
+  "entity": {
+    "sensor": {
+      "bmi": {
+        "default": "mdi:human"
+      },
+      "body_fat": {
+        "default": "mdi:percent"
+      },
+      "body_water": {
+        "default": "mdi:water-percent"
+      },
+      "muscle_percent": {
+        "default": "mdi:arm-flex"
+      },
+      "bone_percent": {
+        "default": "mdi:bone"
+      },
+      "bmr": {
+        "default": "mdi:fire"
+      },
+      "visceral_fat": {
+        "default": "mdi:stomach"
+      },
+      "subcutaneous_fat": {
+        "default": "mdi:percent"
+      },
+      "protein": {
+        "default": "mdi:food-drumstick"
+      },
+      "body_age": {
+        "default": "mdi:calendar-account"
+      },
+      "heart_rate": {
+        "default": "mdi:heart-pulse"
+      },
+      "skeletal_muscle": {
+        "default": "mdi:arm-flex"
+      },
+      "impedance": {
+        "default": "mdi:omega"
+      },
+      "last_profile": {
+        "default": "mdi:account-check",
+        "state": {
+          "unassigned": "mdi:account-question"
+        }
+      },
+      "status": {
+        "default": "mdi:bluetooth",
+        "state": {
+          "connecting": "mdi:bluetooth-settings",
+          "connected": "mdi:bluetooth-connect",
+          "no_connectable_adapter": "mdi:bluetooth-off",
+          "error": "mdi:alert-circle-outline"
+        }
+      },
+      "body_fat_mass": {
+        "default": "mdi:scale-bathroom"
+      },
+      "skeletal_muscle_mass": {
+        "default": "mdi:arm-flex"
+      },
+      "skeletal_muscle_index": {
+        "default": "mdi:arm-flex-outline"
+      },
+      "body_score": {
+        "default": "mdi:star-circle-outline"
+      },
+      "body_type": {
+        "default": "mdi:human"
+      },
+      "waist_hip_ratio": {
+        "default": "mdi:tape-measure"
+      },
+      "obesity_degree": {
+        "default": "mdi:percent"
+      },
+      "target_weight": {
+        "default": "mdi:target"
+      },
+      "weight_control": {
+        "default": "mdi:scale-unbalanced"
+      },
+      "fat_control": {
+        "default": "mdi:scale-unbalanced"
+      },
+      "muscle_control": {
+        "default": "mdi:scale-unbalanced"
+      },
+      "left_arm_fat_mass": {
+        "default": "mdi:water-percent"
+      },
+      "left_arm_fat_vs_standard": {
+        "default": "mdi:water-percent"
+      },
+      "left_arm_muscle_mass": {
+        "default": "mdi:arm-flex"
+      },
+      "left_arm_muscle_vs_standard": {
+        "default": "mdi:arm-flex"
+      },
+      "impedance_20khz_left_arm": {
+        "default": "mdi:omega"
+      },
+      "impedance_100khz_left_arm": {
+        "default": "mdi:omega"
+      },
+      "right_arm_fat_mass": {
+        "default": "mdi:water-percent"
+      },
+      "right_arm_fat_vs_standard": {
+        "default": "mdi:water-percent"
+      },
+      "right_arm_muscle_mass": {
+        "default": "mdi:arm-flex"
+      },
+      "right_arm_muscle_vs_standard": {
+        "default": "mdi:arm-flex"
+      },
+      "impedance_20khz_right_arm": {
+        "default": "mdi:omega"
+      },
+      "impedance_100khz_right_arm": {
+        "default": "mdi:omega"
+      },
+      "trunk_fat_mass": {
+        "default": "mdi:water-percent"
+      },
+      "trunk_fat_vs_standard": {
+        "default": "mdi:water-percent"
+      },
+      "trunk_muscle_mass": {
+        "default": "mdi:arm-flex"
+      },
+      "trunk_muscle_vs_standard": {
+        "default": "mdi:arm-flex"
+      },
+      "impedance_20khz_trunk": {
+        "default": "mdi:omega"
+      },
+      "impedance_100khz_trunk": {
+        "default": "mdi:omega"
+      },
+      "left_leg_fat_mass": {
+        "default": "mdi:water-percent"
+      },
+      "left_leg_fat_vs_standard": {
+        "default": "mdi:water-percent"
+      },
+      "left_leg_muscle_mass": {
+        "default": "mdi:arm-flex"
+      },
+      "left_leg_muscle_vs_standard": {
+        "default": "mdi:arm-flex"
+      },
+      "impedance_20khz_left_leg": {
+        "default": "mdi:omega"
+      },
+      "impedance_100khz_left_leg": {
+        "default": "mdi:omega"
+      },
+      "right_leg_fat_mass": {
+        "default": "mdi:water-percent"
+      },
+      "right_leg_fat_vs_standard": {
+        "default": "mdi:water-percent"
+      },
+      "right_leg_muscle_mass": {
+        "default": "mdi:arm-flex"
+      },
+      "right_leg_muscle_vs_standard": {
+        "default": "mdi:arm-flex"
+      },
+      "impedance_20khz_right_leg": {
+        "default": "mdi:omega"
+      },
+      "impedance_100khz_right_leg": {
+        "default": "mdi:omega"
+      },
+      "muscle_mass_percent": {
+        "default": "mdi:arm-flex"
+      },
+      "weight_goal": {
+        "default": "mdi:flag-checkered"
+      },
+      "weight_to_goal": {
+        "default": "mdi:scale-unbalanced"
+      },
+      "weight_goal_date": {
+        "default": "mdi:calendar-check"
+      },
+      "body_fat_goal": {
+        "default": "mdi:flag-checkered"
+      },
+      "starting_weight": {
+        "default": "mdi:flag-outline"
+      },
+      "starting_body_fat": {
+        "default": "mdi:flag-outline"
+      },
+      "waist": {
+        "default": "mdi:tape-measure"
+      },
+      "hip": {
+        "default": "mdi:tape-measure"
+      }
+    }
+  },
+  "services": {
+    "reassign_last_measurement": {
+      "service": "mdi:account-switch"
+    },
+    "import_history": {
+      "service": "mdi:history"
+    }
+  }
+}

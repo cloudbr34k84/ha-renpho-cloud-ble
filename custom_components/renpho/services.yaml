@@ -1,0 +1,18 @@
+reassign_last_measurement:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: renpho
+    profile_id:
+      required: true
+      selector:
+        text:
+import_history:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: renpho

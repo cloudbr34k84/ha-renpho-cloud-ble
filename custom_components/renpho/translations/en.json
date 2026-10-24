@@ -1,0 +1,404 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Renpho",
+        "menu_options": {
+          "cloud": "Renpho Health account (cloud)",
+          "pick_scale": "Bluetooth scale (local)"
+        }
+      },
+      "cloud": {
+        "title": "Renpho Health account",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        },
+        "description": "Polls your Renpho Health account for each person's latest measurement. Accounts created before 2024 may need migrating to the Renpho Health app first. Very short polling intervals can hit Renpho's API rate limits."
+      },
+      "reauth_confirm": {
+        "data": {
+          "password": "Password"
+        }
+      },
+      "bluetooth_confirm": {
+        "description": "Set up {name}? Add a profile for each person afterwards."
+      },
+      "pick_scale": {
+        "data": {
+          "address": "Scale"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Renpho rejected the login (Renpho code {detail}). Use the email and password of the Renpho Health app (blue icon). Accounts that sign in with Google or Apple have no Renpho password, so they can't be used here.",
+      "cannot_connect": "Couldn't reach the Renpho cloud ({detail}). Check Home Assistant's internet access and try again in a minute."
+    },
+    "abort": {
+      "already_configured": "Already configured",
+      "no_devices_found": "No Renpho scale seen over Bluetooth \u2014 step on it to wake it, then retry",
+      "not_supported": "Not a supported Renpho scale",
+      "reauth_successful": "Re-authenticated"
+    }
+  },
+  "config_subentries": {
+    "profile": {
+      "initiate_flow": {
+        "user": "Add person"
+      },
+      "entry_type": "Person",
+      "step": {
+        "user": {
+          "title": "Add person",
+          "data": {
+            "name": "Name",
+            "sex": "Sex",
+            "birthday": "Birthday",
+            "height_cm": "Height",
+            "start_weight": "Current weight",
+            "tolerance": "Matching tolerance",
+            "algorithm": "Body-fat algorithm",
+            "athlete": "Athlete mode",
+            "scale_profile_byte": "Scale profile byte (MorphoScan, optional)"
+          },
+          "data_description": {
+            "start_weight": "Used to recognise this person until their first reading is stored.",
+            "tolerance": "A reading within this many kg of the person's last weight is assigned to them.",
+            "algorithm": "0x04 matches most Renpho scales; try 0x03 if body fat differs from the app.",
+            "scale_profile_byte": "R-MSC04/R-MSC06 only: the 12th byte of the profile frame the Renpho app writes for this person, as two hex digits. With it, the scale's own body fat, visceral fat and skeletal muscle are used. Leave empty if unknown."
+          }
+        },
+        "reconfigure": {
+          "title": "Edit person",
+          "data": {
+            "name": "Name",
+            "sex": "Sex",
+            "birthday": "Birthday",
+            "height_cm": "Height",
+            "start_weight": "Current weight",
+            "tolerance": "Matching tolerance",
+            "algorithm": "Body-fat algorithm",
+            "athlete": "Athlete mode",
+            "scale_profile_byte": "Scale profile byte (MorphoScan, optional)"
+          },
+          "data_description": {
+            "start_weight": "Used to recognise this person until their first reading is stored.",
+            "tolerance": "A reading within this many kg of the person's last weight is assigned to them.",
+            "algorithm": "0x04 matches most Renpho scales; try 0x03 if body fat differs from the app.",
+            "scale_profile_byte": "R-MSC04/R-MSC06 only: the 12th byte of the profile frame the Renpho app writes for this person, as two hex digits. With it, the scale's own body fat, visceral fat and skeletal muscle are used. Leave empty if unknown."
+          }
+        }
+      },
+      "abort": {
+        "reconfigure_successful": "Saved"
+      },
+      "error": {
+        "name_exists": "A person with this name already uses this scale",
+        "invalid_profile_byte": "Enter two hex digits, e.g. A9"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Polling interval",
+          "allow_writes": "Send guest profile to scale",
+          "capture_all_characteristics": "Capture all BLE characteristics (diagnostics)"
+        },
+        "data_description": {
+          "allow_writes": "MorphoScan scales (R-MSC04/R-MSC06) need a guest profile and clock written on every connection, and extended 0x55aa scales need a guest profile (slot 9, never stored) before they release a final reading. Auto writes only where needed. Never = read-only, which MorphoScan scales answer by hanging up.",
+          "capture_all_characteristics": "Logs every notification for protocol debugging. Download diagnostics to see it."
+        }
+      }
+    }
+  },
+  "selector": {
+    "allow_writes": {
+      "options": {
+        "auto": "Auto",
+        "never": "Never (read-only)",
+        "always": "Always"
+      }
+    },
+    "sex": {
+      "options": {
+        "male": "Male",
+        "female": "Female"
+      }
+    },
+    "algorithm": {
+      "options": {
+        "0x04": "Default (0x04)",
+        "0x03": "Alternative (0x03)"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "weight": {
+        "name": "Weight"
+      },
+      "bmi": {
+        "name": "BMI"
+      },
+      "body_fat": {
+        "name": "Body fat"
+      },
+      "body_water": {
+        "name": "Body water"
+      },
+      "muscle_percent": {
+        "name": "Skeletal muscle"
+      },
+      "bone_percent": {
+        "name": "Bone"
+      },
+      "bmr": {
+        "name": "Basal metabolic rate"
+      },
+      "visceral_fat": {
+        "name": "Visceral fat"
+      },
+      "subcutaneous_fat": {
+        "name": "Subcutaneous fat"
+      },
+      "protein": {
+        "name": "Protein"
+      },
+      "body_age": {
+        "name": "Body age"
+      },
+      "lean_body_mass": {
+        "name": "Muscle mass"
+      },
+      "fat_free_mass": {
+        "name": "Fat-free mass"
+      },
+      "heart_rate": {
+        "name": "Heart rate"
+      },
+      "last_measurement": {
+        "name": "Last measurement"
+      },
+      "skeletal_muscle": {
+        "name": "Skeletal muscle"
+      },
+      "muscle_mass": {
+        "name": "Muscle mass"
+      },
+      "bone_mass": {
+        "name": "Bone mass"
+      },
+      "impedance": {
+        "name": "Impedance"
+      },
+      "last_weight": {
+        "name": "Last weight"
+      },
+      "last_profile": {
+        "name": "Last person"
+      },
+      "battery": {
+        "name": "Battery"
+      },
+      "status": {
+        "name": "Connection status",
+        "state": {
+          "idle": "Idle",
+          "connecting": "Connecting",
+          "connected": "Connected",
+          "no_connectable_adapter": "No connectable proxy",
+          "error": "Error"
+        }
+      },
+      "rssi": {
+        "name": "Signal strength"
+      },
+      "body_fat_mass": {
+        "name": "Body fat mass"
+      },
+      "skeletal_muscle_mass": {
+        "name": "Skeletal muscle mass"
+      },
+      "skeletal_muscle_index": {
+        "name": "Skeletal muscle index"
+      },
+      "body_score": {
+        "name": "Body score"
+      },
+      "body_type": {
+        "name": "Body type"
+      },
+      "waist_hip_ratio": {
+        "name": "Waist-hip ratio"
+      },
+      "obesity_degree": {
+        "name": "Obesity degree"
+      },
+      "target_weight": {
+        "name": "Target weight"
+      },
+      "weight_control": {
+        "name": "Weight control"
+      },
+      "fat_control": {
+        "name": "Fat control"
+      },
+      "muscle_control": {
+        "name": "Muscle control"
+      },
+      "left_arm_fat_mass": {
+        "name": "Left arm fat mass"
+      },
+      "left_arm_fat_vs_standard": {
+        "name": "Left arm fat vs standard"
+      },
+      "left_arm_muscle_mass": {
+        "name": "Left arm muscle mass"
+      },
+      "left_arm_muscle_vs_standard": {
+        "name": "Left arm muscle vs standard"
+      },
+      "impedance_20khz_left_arm": {
+        "name": "Impedance 20 kHz left arm"
+      },
+      "impedance_100khz_left_arm": {
+        "name": "Impedance 100 kHz left arm"
+      },
+      "right_arm_fat_mass": {
+        "name": "Right arm fat mass"
+      },
+      "right_arm_fat_vs_standard": {
+        "name": "Right arm fat vs standard"
+      },
+      "right_arm_muscle_mass": {
+        "name": "Right arm muscle mass"
+      },
+      "right_arm_muscle_vs_standard": {
+        "name": "Right arm muscle vs standard"
+      },
+      "impedance_20khz_right_arm": {
+        "name": "Impedance 20 kHz right arm"
+      },
+      "impedance_100khz_right_arm": {
+        "name": "Impedance 100 kHz right arm"
+      },
+      "trunk_fat_mass": {
+        "name": "Trunk fat mass"
+      },
+      "trunk_fat_vs_standard": {
+        "name": "Trunk fat vs standard"
+      },
+      "trunk_muscle_mass": {
+        "name": "Trunk muscle mass"
+      },
+      "trunk_muscle_vs_standard": {
+        "name": "Trunk muscle vs standard"
+      },
+      "impedance_20khz_trunk": {
+        "name": "Impedance 20 kHz trunk"
+      },
+      "impedance_100khz_trunk": {
+        "name": "Impedance 100 kHz trunk"
+      },
+      "left_leg_fat_mass": {
+        "name": "Left leg fat mass"
+      },
+      "left_leg_fat_vs_standard": {
+        "name": "Left leg fat vs standard"
+      },
+      "left_leg_muscle_mass": {
+        "name": "Left leg muscle mass"
+      },
+      "left_leg_muscle_vs_standard": {
+        "name": "Left leg muscle vs standard"
+      },
+      "impedance_20khz_left_leg": {
+        "name": "Impedance 20 kHz left leg"
+      },
+      "impedance_100khz_left_leg": {
+        "name": "Impedance 100 kHz left leg"
+      },
+      "right_leg_fat_mass": {
+        "name": "Right leg fat mass"
+      },
+      "right_leg_fat_vs_standard": {
+        "name": "Right leg fat vs standard"
+      },
+      "right_leg_muscle_mass": {
+        "name": "Right leg muscle mass"
+      },
+      "right_leg_muscle_vs_standard": {
+        "name": "Right leg muscle vs standard"
+      },
+      "impedance_20khz_right_leg": {
+        "name": "Impedance 20 kHz right leg"
+      },
+      "impedance_100khz_right_leg": {
+        "name": "Impedance 100 kHz right leg"
+      },
+      "muscle_mass_percent": {
+        "name": "Muscle mass percentage"
+      },
+      "weight_goal": {
+        "name": "Weight goal"
+      },
+      "weight_to_goal": {
+        "name": "Weight to goal"
+      },
+      "weight_goal_date": {
+        "name": "Weight goal date"
+      },
+      "body_fat_goal": {
+        "name": "Body fat goal"
+      },
+      "starting_weight": {
+        "name": "Starting weight"
+      },
+      "starting_body_fat": {
+        "name": "Starting body fat"
+      },
+      "waist": {
+        "name": "Waist"
+      },
+      "hip": {
+        "name": "Hip"
+      }
+    }
+  },
+  "services": {
+    "reassign_last_measurement": {
+      "name": "Reassign last measurement",
+      "description": "Move the scale's last reading to a different person (when weight matching picked the wrong one).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Scale",
+          "description": "The Renpho Bluetooth scale entry."
+        },
+        "profile_id": {
+          "name": "Person ID",
+          "description": "Subentry ID of the person (see the scale's Last person sensor attributes or the integration page)."
+        }
+      }
+    },
+    "import_history": {
+      "name": "Import history",
+      "description": "Re-import the Renpho cloud account's full measurement history into the long-term statistics of its sensors.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Cloud account",
+          "description": "The Renpho cloud entry."
+        }
+      }
+    }
+  },
+  "system_health": {
+    "info": {
+      "can_reach_server": "Reach Renpho cloud",
+      "cloud_accounts": "Cloud accounts",
+      "bluetooth_scales": "Bluetooth scales"
+    }
+  }
+}

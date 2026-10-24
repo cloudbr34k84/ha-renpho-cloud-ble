@@ -1,0 +1,11 @@
+pytest-homeassistant-custom-component
+pytest-asyncio
+# Bluetooth stack used by homeassistant.components.bluetooth
+habluetooth
+bleak-retry-connector
+bluetooth-adapters
+# Upstream libraries the ports are cross-checked against (tests only, not runtime)
+renpho-escs20m==0.8.0
+renpho-api==0.2.0
+pycryptodome
+requests

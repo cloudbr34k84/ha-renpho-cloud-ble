@@ -37,9 +37,11 @@ ln -s ../brads_dev/ha-renpho-cloud-ble/custom_components/renpho renpho
 ## Running the Tests
 
 ```bash
+cd /homeassistant/brads_dev/ha-renpho-cloud-ble
 python3 -m venv /tmp/renpho-venv
 /tmp/renpho-venv/bin/pip install -r requirements_test.txt
-cd /homeassistant/brads_dev/ha-renpho-cloud-ble
+/tmp/renpho-venv/bin/python scripts/ha_component_requirements.py > /tmp/ha-reqs.txt
+/tmp/renpho-venv/bin/pip install -r /tmp/ha-reqs.txt
 /tmp/renpho-venv/bin/python -m pytest -q
 ```
 

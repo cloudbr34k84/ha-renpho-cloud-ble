@@ -1,9 +1,7 @@
 pytest-homeassistant-custom-component
 pytest-asyncio
-# Bluetooth stack used by homeassistant.components.bluetooth
-habluetooth
-bleak-retry-connector
-bluetooth-adapters
+# The Bluetooth/USB/recorder component requirements come from the installed HA:
+#   pip install -r <(python scripts/ha_component_requirements.py)
 # Upstream libraries the ports are cross-checked against (tests only, not runtime)
 renpho-escs20m==0.8.0
 renpho-api==0.2.0

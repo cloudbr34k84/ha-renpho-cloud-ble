@@ -15,11 +15,20 @@
           "email": "Email",
           "password": "Password"
         },
-        "description": "Polls your Renpho Health account for each person's latest measurement. Accounts created before 2024 may need migrating to the Renpho Health app first. Very short polling intervals can hit Renpho's API rate limits."
+        "description": "Polls your Renpho Health account for each person's latest measurement. Accounts created before 2024 may need migrating to the Renpho Health app first. Very short polling intervals can hit Renpho's API rate limits.",
+        "data_description": {
+          "email": "Email address used to sign in to the Renpho Health app.",
+          "password": "Renpho Health password; Google and Apple sign-in accounts need a Renpho password."
+        }
       },
       "reauth_confirm": {
         "data": {
-          "password": "Password"
+          "password": "Password",
+          "email": "Email"
+        },
+        "data_description": {
+          "password": "Your current Renpho Health password.",
+          "email": "Current email for this same Renpho Health account. Change it here if you changed it in the app."
         }
       },
       "bluetooth_confirm": {
@@ -28,6 +37,9 @@
       "pick_scale": {
         "data": {
           "address": "Scale"
+        },
+        "data_description": {
+          "address": "A supported scale heard by Home Assistant; step on the scale to wake it."
         }
       }
     },
@@ -39,7 +51,8 @@
       "already_configured": "Already configured",
       "no_devices_found": "No Renpho scale seen over Bluetooth \u2014 step on it to wake it, then retry",
       "not_supported": "Not a supported Renpho scale",
-      "reauth_successful": "Re-authenticated"
+      "reauth_successful": "Re-authenticated",
+      "wrong_account": "Sign in to the same Renpho account as this entry."
     }
   },
   "config_subentries": {
@@ -66,7 +79,12 @@
             "start_weight": "Used to recognise this person until their first reading is stored.",
             "tolerance": "A reading within this many kg of the person's last weight is assigned to them.",
             "algorithm": "0x04 matches most Renpho scales; try 0x03 if body fat differs from the app.",
-            "scale_profile_byte": "R-MSC04/R-MSC06 only: the 12th byte of the profile frame the Renpho app writes for this person, as two hex digits. With it, the scale's own body fat, visceral fat and skeletal muscle are used. Leave empty if unknown."
+            "scale_profile_byte": "R-MSC04/R-MSC06 only: the 12th byte of the profile frame the Renpho app writes for this person, as two hex digits. With it, the scale's own body fat, visceral fat and skeletal muscle are used. Leave empty if unknown.",
+            "name": "Name of the person using this scale.",
+            "sex": "Sex used by the body composition formula.",
+            "birthday": "Date of birth used to calculate age for body composition.",
+            "height_cm": "Height in centimeters used by the body composition formula.",
+            "athlete": "Use the athlete adjustment in the body composition formula."
           }
         },
         "reconfigure": {
@@ -86,7 +104,12 @@
             "start_weight": "Used to recognise this person until their first reading is stored.",
             "tolerance": "A reading within this many kg of the person's last weight is assigned to them.",
             "algorithm": "0x04 matches most Renpho scales; try 0x03 if body fat differs from the app.",
-            "scale_profile_byte": "R-MSC04/R-MSC06 only: the 12th byte of the profile frame the Renpho app writes for this person, as two hex digits. With it, the scale's own body fat, visceral fat and skeletal muscle are used. Leave empty if unknown."
+            "scale_profile_byte": "R-MSC04/R-MSC06 only: the 12th byte of the profile frame the Renpho app writes for this person, as two hex digits. With it, the scale's own body fat, visceral fat and skeletal muscle are used. Leave empty if unknown.",
+            "name": "Name of the person using this scale.",
+            "sex": "Sex used by the body composition formula.",
+            "birthday": "Date of birth used to calculate age for body composition.",
+            "height_cm": "Height in centimeters used by the body composition formula.",
+            "athlete": "Use the athlete adjustment in the body composition formula."
           }
         }
       },
@@ -103,7 +126,6 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Polling interval",
           "allow_writes": "Send guest profile to scale",
           "capture_all_characteristics": "Capture all BLE characteristics (diagnostics)"
         },
@@ -483,6 +505,44 @@
       "can_reach_server": "Reach Renpho cloud",
       "cloud_accounts": "Cloud accounts",
       "bluetooth_scales": "Bluetooth scales"
+    }
+  },
+  "exceptions": {
+    "not_ble_entry": {
+      "message": "Not a Renpho Bluetooth scale entry"
+    },
+    "unknown_profile": {
+      "message": "Unknown profile id"
+    },
+    "no_measurement": {
+      "message": "The scale has no measurement to reassign"
+    },
+    "not_cloud_entry": {
+      "message": "Not a Renpho cloud entry"
+    },
+    "entry_not_loaded": {
+      "message": "The Renpho cloud entry isn't loaded"
+    },
+    "recorder_required": {
+      "message": "History import requires the recorder integration"
+    },
+    "history_import_failed": {
+      "message": "Unable to import Renpho history: {error}"
+    },
+    "rate_limited": {
+      "message": "Renpho limited requests. Try again after {seconds} seconds."
+    },
+    "invalid_auth": {
+      "message": "Renpho rejected the credentials. Reauthenticate with your Renpho Health password."
+    },
+    "cloud_update_failed": {
+      "message": "Unable to fetch Renpho cloud data: {error}"
+    }
+  },
+  "issues": {
+    "no_connectable_adapter": {
+      "title": "No connectable Bluetooth adapter for {entry}",
+      "description": "Home Assistant heard this scale but cannot connect to it. Add a supported Bluetooth adapter or move an ESPHome Bluetooth proxy closer to the scale. Enable active connections on the proxy with `bluetooth_proxy: active: true`, then wake the scale. The issue clears after a successful connection."
     }
   }
 }

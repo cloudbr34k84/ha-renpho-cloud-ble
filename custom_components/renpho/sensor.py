@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -22,16 +22,14 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import CONNECTION_BLUETOOTH, DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from . import ble_protocol as proto
 from .ble_scale import RenphoBleScale
-from .const import CONF_MODEL_ID, CONF_NAME, CONF_SOURCE, DOMAIN, SIGNAL_BLE_UPDATE, SOURCE_CLOUD, SUBENTRY_PROFILE
+from .const import CONF_SOURCE, DOMAIN, SOURCE_CLOUD, SUBENTRY_PROFILE
 from .coordinator import RenphoCloudCoordinator, RenphoConfigEntry
+from .entity import RenphoBleEntity, RenphoCloudEntity, cloud_unique_id, track_entity_removal
 
 # Read-only sensors fed by a coordinator / dispatcher — no update throttling needed
 PARALLEL_UPDATES = 0
@@ -76,7 +74,11 @@ def _ts(name: str) -> Callable[[dict[str, Any]], datetime | None]:
     return fn
 
 
-def _d(key, unit=None, dc=None, src=None, prec=1, zero_ok=False, translation_key=None, **kw) -> RenphoSensorDescription:
+def _d(
+    key: str, unit: str | None = None, dc: SensorDeviceClass | None = None,
+    src: str | None = None, prec: int = 1, zero_ok: bool = False,
+    translation_key: str | None = None, **kw: Any,
+) -> RenphoSensorDescription:
     return RenphoSensorDescription(
         key=key,
         translation_key=translation_key or key,
@@ -199,7 +201,7 @@ def _mass_of(pct_key: str) -> Callable[[dict[str, Any]], float | None]:
     return fn
 
 
-def _status_desc(key: str, value_fn, low_key: str, high_key: str) -> RenphoSensorDescription:
+def _status_desc(key: str, value_fn: Callable[[dict[str, Any]], float | None], low_key: str, high_key: str) -> RenphoSensorDescription:
     return RenphoSensorDescription(
         key=key, translation_key=key, device_class=SensorDeviceClass.ENUM, options=STATUS_OPTIONS,
         value_fn=_status(value_fn, low_key, high_key), optional=True, history=False,
@@ -257,7 +259,7 @@ PROFILE_SENSORS: tuple[RenphoSensorDescription, ...] = (
     _d("protein", PERCENTAGE),
     _d("bmr", KCAL, prec=0),
     _d("visceral_fat", prec=0),
-    _d("impedance", OHM, src="resistance", prec=0, entity_registry_enabled_default=False),
+    _d("impedance", OHM, src="resistance", prec=0, entity_category=EntityCategory.DIAGNOSTIC, entity_registry_enabled_default=False),
     RenphoSensorDescription(
         key="last_measurement", translation_key="last_measurement",
         device_class=SensorDeviceClass.TIMESTAMP, value_fn=_ts("measured_at"),
@@ -270,7 +272,7 @@ SCALE_SENSORS: tuple[RenphoSensorDescription, ...] = (
         key="last_profile", translation_key="last_profile",
         value_fn=lambda d: d.get("profile") or ("unassigned" if d.get("weight") else None),
     ),
-    _d("impedance", OHM, src="resistance", prec=0),
+    _d("impedance", OHM, src="resistance", prec=0, entity_category=EntityCategory.DIAGNOSTIC, entity_registry_enabled_default=False),
     RenphoSensorDescription(
         key="last_measurement", translation_key="last_measurement",
         device_class=SensorDeviceClass.TIMESTAMP, value_fn=_ts("measured_at"),
@@ -283,8 +285,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: RenphoConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     if entry.data.get(CONF_SOURCE) == SOURCE_CLOUD:
-        coordinator: RenphoCloudCoordinator = entry.runtime_data
-        known: set[tuple[str, str]] = set()
+        coordinator = cast(RenphoCloudCoordinator, entry.runtime_data)
+        known: dict[tuple[str, str], RenphoCloudSensor] = {}
+        track_entity_removal(hass, entry, known)
         registry = er.async_get(hass)
         by_key = {desc.key: desc for desc in ALL_CLOUD_SENSORS}
         for uid, record in (coordinator.data or {}).get("latest", {}).items():
@@ -304,8 +307,9 @@ async def async_setup_entry(
                         continue
                     if desc.optional and desc.value_fn(profile if desc.from_profile else record) is None:
                         continue  # e.g. segment metrics on a 4-electrode scale
-                    known.add((uid, desc.key))
-                    new.append(RenphoCloudSensor(coordinator, uid, desc))
+                    entity = RenphoCloudSensor(coordinator, uid, desc)
+                    known[(uid, desc.key)] = entity
+                    new.append(entity)
             if new:
                 async_add_entities(new)
 
@@ -313,7 +317,7 @@ async def async_setup_entry(
         entry.async_on_unload(coordinator.async_add_listener(_add_entities))
         return
 
-    scale: RenphoBleScale = entry.runtime_data
+    scale = cast(RenphoBleScale, entry.runtime_data)
     async_add_entities(
         [RenphoScaleSensor(scale, None, d) for d in SCALE_SENSORS]
         + [RenphoScaleStatusSensor(scale), RenphoScaleRssiSensor(scale)]
@@ -326,36 +330,13 @@ async def async_setup_entry(
             )
 
 
-def cloud_scope(entry: RenphoConfigEntry) -> str:
-    # Scoped to the account: two family accounts each list the other's members
-    return entry.unique_id or entry.entry_id
-
-
-def cloud_unique_id(entry: RenphoConfigEntry, uid: str, key: str) -> str:
-    return f"{cloud_scope(entry)}_{uid}_{key}"
-
-
-def cloud_device_info(coordinator: RenphoCloudCoordinator, uid: str) -> DeviceInfo:
-    """The person's device; every platform describes it in full (any may create it)."""
-    name = (coordinator.data or {}).get("users", {}).get(uid, uid)
-    return DeviceInfo(
-        identifiers={(DOMAIN, f"{cloud_scope(coordinator.config_entry)}_{uid}")},
-        name=f"Renpho Cloud {name}",
-        manufacturer="Renpho",
-        model="Renpho Health account",
-    )
-
-
-class RenphoCloudSensor(CoordinatorEntity[RenphoCloudCoordinator], SensorEntity):
+class RenphoCloudSensor(RenphoCloudEntity, SensorEntity):
     _attr_has_entity_name = True
     entity_description: RenphoSensorDescription
 
     def __init__(self, coordinator: RenphoCloudCoordinator, uid: str, desc: RenphoSensorDescription) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, uid, desc.key)
         self.entity_description = desc
-        self._uid = uid
-        self._attr_unique_id = cloud_unique_id(coordinator.config_entry, uid, desc.key)
-        self._attr_device_info = cloud_device_info(coordinator, uid)
 
     @property
     def _record(self) -> dict[str, Any]:
@@ -383,43 +364,7 @@ class RenphoCloudSensor(CoordinatorEntity[RenphoCloudCoordinator], SensorEntity)
         return attrs or None
 
 
-class _BleEntity(SensorEntity):
-    _attr_has_entity_name = True
-    _attr_should_poll = False
-
-    def __init__(self, scale: RenphoBleScale, subentry_id: str | None) -> None:
-        self._scale = scale
-        self._sid = subentry_id
-        scale_ident = (DOMAIN, scale.address)
-        if subentry_id is None:
-            model = proto.model_name(scale.entry.data.get(CONF_MODEL_ID))
-            self._attr_device_info = DeviceInfo(
-                identifiers={scale_ident},
-                connections={(CONNECTION_BLUETOOTH, scale.address)},
-                name=f"Renpho {model}",
-                manufacturer="Renpho",
-                model=model,
-                sw_version=scale.scale.get("firmware"),
-            )
-        else:
-            sub = scale.entry.subentries[subentry_id]
-            self._attr_device_info = DeviceInfo(
-                identifiers={(DOMAIN, f"{scale.address}_{subentry_id}")},
-                name=f"Renpho Scale {sub.data[CONF_NAME]}",
-                manufacturer="Renpho",
-                model="Scale profile",
-                via_device=scale_ident,
-            )
-
-    async def async_added_to_hass(self) -> None:
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass, SIGNAL_BLE_UPDATE.format(self._scale.entry.entry_id), self.async_write_ha_state
-            )
-        )
-
-
-class RenphoScaleSensor(_BleEntity):
+class RenphoScaleSensor(RenphoBleEntity, SensorEntity):
     entity_description: RenphoSensorDescription
 
     def __init__(self, scale: RenphoBleScale, sid: str | None, desc: RenphoSensorDescription) -> None:
@@ -443,7 +388,12 @@ class RenphoScaleSensor(_BleEntity):
         return attrs
 
 
-class RenphoScaleStatusSensor(_BleEntity):
+class RenphoScaleStatusSensor(RenphoBleEntity, SensorEntity):
+    @property
+    def available(self) -> bool:
+        """Keep the connection diagnostic visible during transport failures."""
+        return True
+
     _attr_translation_key = "status"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_device_class = SensorDeviceClass.ENUM
@@ -473,7 +423,7 @@ class RenphoScaleStatusSensor(_BleEntity):
         }
 
 
-class RenphoScaleRssiSensor(_BleEntity):
+class RenphoScaleRssiSensor(RenphoBleEntity, SensorEntity):
     _attr_translation_key = "rssi"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH

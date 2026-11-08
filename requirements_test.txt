@@ -7,3 +7,7 @@ renpho-escs20m==0.8.0
 renpho-api==0.2.0
 pycryptodome
 requests
+# Bronze config-flow coverage gate
+pytest-cov
+# Platinum strict type-checking gate
+mypy==2.4.1

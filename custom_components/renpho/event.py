@@ -7,18 +7,17 @@ data), so weigh-ins made while Home Assistant was down still fire, in order.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.event import EventEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .cloud_api import _ts
 from .const import CONF_SOURCE, SOURCE_CLOUD
 from .coordinator import RenphoCloudCoordinator, RenphoConfigEntry
-from .sensor import cloud_device_info, cloud_unique_id
+from .entity import RenphoCloudEntity, track_entity_removal
 
 PARALLEL_UPDATES = 0
 EVENT_MEASUREMENT = "measurement"
@@ -44,31 +43,29 @@ async def async_setup_entry(
 ) -> None:
     if entry.data.get(CONF_SOURCE) != SOURCE_CLOUD:
         return
-    coordinator: RenphoCloudCoordinator = entry.runtime_data
-    known: set[str] = set()
+    coordinator = cast(RenphoCloudCoordinator, entry.runtime_data)
+    known: dict[str, RenphoMeasurementEvent] = {}
+    track_entity_removal(hass, entry, known)
 
     @callback
     def _add_people() -> None:
         new = [uid for uid in (coordinator.data or {}).get("latest", {}) if uid not in known]
-        known.update(new)
         if new:
-            async_add_entities(RenphoMeasurementEvent(coordinator, uid) for uid in new)
+            entities = {uid: RenphoMeasurementEvent(coordinator, uid) for uid in new}
+            known.update(entities)
+            async_add_entities(entities.values())
 
     _add_people()
     entry.async_on_unload(coordinator.async_add_listener(_add_people))
 
 
-class RenphoMeasurementEvent(CoordinatorEntity[RenphoCloudCoordinator], EventEntity):
+class RenphoMeasurementEvent(RenphoCloudEntity, EventEntity):
     _attr_has_entity_name = True
     _attr_translation_key = "measurement"
     _attr_event_types = [EVENT_MEASUREMENT]
 
     def __init__(self, coordinator: RenphoCloudCoordinator, uid: str) -> None:
-        super().__init__(coordinator)
-        self._uid = uid
-        entry = coordinator.config_entry
-        self._attr_unique_id = cloud_unique_id(entry, uid, "measurement_event")
-        self._attr_device_info = cloud_device_info(coordinator, uid)
+        super().__init__(coordinator, uid, "measurement_event")
         self._fired_until: int | None = None
 
     async def async_added_to_hass(self) -> None:

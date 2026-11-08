@@ -42,7 +42,7 @@ Requires Home Assistant 2026.10 or newer.
 
 ### Cloud
 
-*Settings → Devices & services → Add integration → Renpho → Renpho Health account (cloud)* and enter your Renpho Health email and password. One device appears per family member on the account (`Renpho Cloud <name>`). The polling interval defaults to 30 minutes (minimum 5) and can be changed under *Configure*.
+*Settings → Devices & services → Add integration → Renpho → Renpho Health account (cloud)* and enter your Renpho Health email and password. One device appears per family member on the account (`Renpho Cloud <name>`). Cloud measurements are checked every 30 minutes, suitable for occasional weigh-ins and avoiding unnecessary API requests. To choose a custom interval, disable automatic polling in the entry’s system options and use an automation calling `homeassistant.update_entity` on a cloud sensor. Existing custom polling options are superseded by this fixed default.
 
 Accounts created before 2024 may need migrating to the Renpho Health app first. Very short polling intervals can hit Renpho's API rate limits.
 
@@ -113,7 +113,7 @@ People weighed on a body-composition analyser (8-electrode, e.g. R-MSC04/R-MSC06
 
 **Bluetooth person:** weight, BMI, body fat, body water, skeletal muscle, muscle mass, bone mass, fat-free mass, protein, BMR, visceral fat (MorphoScan only), impedance (0x55aa only, disabled by default) and last measurement.
 
-**Bluetooth scale:** last weight, last person, impedance, last measurement, battery, connection status and signal strength (disabled by default).
+**Bluetooth scale:** last weight, last person, last measurement, battery and connection status. Raw impedance and signal strength are diagnostic sensors disabled by default.
 
 Every Bluetooth reading also fires a `renpho_measurement` event:
 
@@ -146,7 +146,7 @@ Every Bluetooth session records the scale's full GATT table (with the values of 
 3. *Settings → Devices & services → Renpho → ⋮ → Download diagnostics*.
 4. Open an issue and attach the file. Mention what the display showed: weight, and body fat if shown.
 
-Diagnostics are made to be shared publicly. They contain no account data, no names, birthdays or heights, and only the first half of each MAC address. They do include the weights the scale sent.
+Diagnostics redact credentials, names, birthdays, heights, serial numbers and opaque BLE payload bytes. They keep command/timing information, firmware/battery information, connection status, and measurements including weights. Review the measurements before sharing. Raw payloads needed to investigate unknown protocols are available through debug logging; downloadable diagnostics omit them.
 
 ## Troubleshooting
 
@@ -173,6 +173,7 @@ logger:
 - **Wrong person matched repeatedly:** edit the person and correct their current weight. Matching uses their last stored reading.
 - **Remove a person:** delete them from the scale's entry. Their device, entities and stored readings are removed.
 - **Start over with a scale:** delete the entry. Stored readings (`.storage/renpho.<entry_id>`) are deleted with it. It is rediscovered the next time you step on the scale.
+- **Changed Renpho email:** edit the prefilled email in the reauthentication prompt; signing into the same account preserves entities and history.
 - **Changed Renpho password:** the next poll fails to log in and Home Assistant shows a re-authentication prompt on the entry. Enter the new password there.
 - **Different Renpho account:** delete the cloud entry and add it again.
 
@@ -185,3 +186,140 @@ Built on the work of these projects:
 - [KristianP26/ble-scale-sync](https://github.com/KristianP26/ble-scale-sync): the MorphoScan (R-MSC04) protocol, worked out with its users from real captures. That project is GPL-3.0, so only the documented wire facts are used here; no code is copied.
 
 This project is MIT-licensed (see [LICENSE](LICENSE)); the upstream projects' notices are in [NOTICE](NOTICE). Not affiliated with or endorsed by Renpho.
+
+## Removing the integration
+
+1. Open **Settings → Devices & services → Renpho**.
+2. Open each account or scale entry’s three-dot menu and select **Delete**. Repeat for all entries.
+3. Remove Renpho from HACS, or delete `custom_components/renpho` for a manual installation, then restart Home Assistant.
+
+Deleting a Bluetooth entry removes its stored local readings and profiles. Deleting a cloud entry removes the history-import tracking file; it does not delete your Renpho account or cloud measurements. Recorder history and imported long-term statistics follow Home Assistant’s recorder retention and statistics management.
+
+## Action reference
+
+Both actions require a loaded Renpho entry. `renpho.reassign_last_measurement` requires `config_entry_id` (Bluetooth entry) and `profile_id` (person subentry ID). It assigns the last reading to that person and takes no response. `renpho.import_history` requires `config_entry_id` (cloud entry), resets import tracking and imports all available measurements; its optional response is `hours_imported`, the number of hourly statistic records imported. See the measurement event examples above for automation triggers. The integration provides no custom conditions or device triggers.
+
+## Setup fields and options
+
+Cloud setup asks for **Email** and **Password** from the Renpho Health app (blue icon). Use the email shown in the app's account settings. Google/Apple sign-in alone does not provide a Renpho password. If the password changes, enter the current **Email** and **Password** in the reauthentication prompt; the account must remain the same. The email is prefilled and can be changed if you changed it in Renpho Health.
+
+Bluetooth setup asks for **Scale**: choose a supported scale discovered nearby. Wake it by stepping on it. No address needs to be typed.
+
+Choose **Add person**, or edit an existing person, for these fields:
+
+| Field | Meaning and suitable values |
+|---|---|
+| Name | The person's name, unique within this scale. |
+| Sex | Male or Female, used by the body composition formula. |
+| Birthday | The person's date of birth, used to calculate age. |
+| Height | Height in centimeters, 50–250 cm. |
+| Current weight | Starting weight, 10–300 kg; used for matching until a reading is stored. |
+| Matching tolerance | Maximum difference from the person's last weight, 0.5–15 kg; default 3 kg. Use a smaller value when people's weights are close. |
+| Body-fat algorithm | Default (0x04) for most scales; Alternative (0x03) if the default differs from the app. |
+| Athlete mode | Enable only when the person uses athlete mode in the Renpho app. Default off. |
+| Scale profile byte (MorphoScan, optional) | Two hex digits from the app's profile frame; see the MorphoScan capture instructions above. Leave empty if unknown. |
+
+Open **Settings → Devices & services → Renpho → Configure** for Bluetooth options:
+
+| Option | Meaning and suitable values |
+|---|---|
+| Send guest profile to scale | **Auto** (default): writes only for scale families that need the handshake. **Never (read-only)**: prevents writes, but MorphoScan scales then disconnect without a completed reading. **Always**: enables the guest-profile handshake for other supported scales when needed. |
+| Capture all BLE characteristics (diagnostics) | Default on. Captures additional notifications for diagnosing protocol support. Turn off to limit subscriptions to known measurement characteristics. |
+
+Cloud entries have no integration-specific options. Polling defaults to 30 minutes; use Home Assistant's standard polling controls described above to change it.
+
+## Availability and errors
+
+Cloud sensors and events become unavailable when a cloud update fails and recover when a later update succeeds. Missing individual metrics report unknown. Bluetooth readings describe the last completed weigh-in and remain valid while the battery-powered scale sleeps. A failed connection or missing connectable adapter makes the measurement sensors unavailable until a successful connection; the connection-status diagnostic remains visible. Loss and recovery are each logged once, with repeated failures kept quiet.
+
+Actions report invalid targets, unknown profiles, missing readings and disabled recorder support as validation errors. History download/storage failures report an action error so automations stop instead of silently continuing.
+
+## Data updates
+
+Cloud entries poll every 30 minutes. A local Bluetooth scale waking up also schedules cloud checks 90 and 300 seconds later. Each check reads the account and family members from Renpho Health; the first history import may make many paginated requests. Renpho's exact request quota is not documented by this integration. HTTP 429 responses pause polling for the server's `Retry-After` duration, or 15 minutes when it supplies no usable duration. Shorter polling and repeated full-history imports increase the chance of rate limiting.
+
+Bluetooth uses advertisements to start a connection, then receives measurement notifications. It does not poll a sleeping scale. Only a completed reading or a stable-weight fallback updates measurement sensors; live settling weight is diagnostic information on the connection-status sensor. Cloud and Bluetooth readings remain separate so you can choose the source for each dashboard or automation.
+
+## Supported and unsupported devices
+
+The Status table above distinguishes protocol-tested support from hardware verification. Cloud support depends on measurements reaching **Renpho Health**. The local decoder handles manufacturer ID `0x1A10`, basic/extended `0x55aa` frames and experimental MorphoScan frames. Known model labels include ES-CS20MB1, ES-CS20MB2, R-A012, R-A016, ES-26BB-B, R-MSC04 and R-MSC06; protocol recognition does not establish that every firmware version works.
+
+Other Bluetooth manufacturer IDs and unrelated protocols are rejected. A device that cannot expose a supported Bluetooth protocol cannot use the local source; it may still use cloud if it syncs to Renpho Health. Google/Apple-only sign-in without a Renpho password is unsupported. Accounts in older Renpho apps may require migration to Renpho Health.
+
+## Known limitations
+
+- Local MorphoScan support is experimental. A profile byte and matching height are needed before the scale's analysis is trusted. A connection that drops before analysis completes can provide weight only.
+- A scale accepts one Bluetooth connection at a time. Close the phone app when using local capture. Receiving a reading locally does not guarantee that it subsequently syncs to the cloud.
+- Cloud data arrives only after the Renpho app uploads it, and can lag behind a local reading. The integration cannot force an app upload.
+- Local profile matching uses weight, so people with similar weights can be confused. Use the reassignment action to correct the last reading.
+- The integration reads measurements; it does not configure pregnancy mode, manage Renpho account members, or replace the manufacturer's app.
+- Model recognition and complete test coverage do not replace hardware testing. The Status table records the known verification level.
+
+## Use cases and automation examples
+
+Use local readings to record a weigh-in immediately, cloud history to show long-term trends, and cloud Measurement events to run an automation once per uploaded weigh-in. Family members and optional metrics are added automatically when later cloud updates contain them. Set goals in Renpho Health and show the goal sensors beside your latest weight on a dashboard.
+
+These examples go in the automation editor's YAML view. Replace the address or entity ID with your own. They use Home Assistant's built-in persistent notifications.
+
+### Notify after a local weigh-in
+
+```yaml
+alias: Renpho local weigh-in
+triggers:
+  - trigger: event
+    event_type: renpho_measurement
+    event_data:
+      address: "60:65:F4:12:34:56"
+conditions:
+  - condition: template
+    value_template: "{{ not trigger.event.data.reassigned }}"
+actions:
+  - action: persistent_notification.create
+    data:
+      title: New weigh-in
+      message: "{{ trigger.event.data.profile or 'Unassigned' }}: {{ trigger.event.data.weight }} kg"
+mode: queued
+```
+
+### Notify after a cloud measurement event
+
+```yaml
+alias: Renpho cloud weigh-in
+triggers:
+  - trigger: state
+    entity_id: event.renpho_cloud_alex_measurement
+    not_from:
+      - unknown
+      - unavailable
+    not_to:
+      - unknown
+      - unavailable
+conditions:
+  - condition: template
+    value_template: "{{ trigger.to_state.attributes.get('event_type') == 'measurement' }}"
+actions:
+  - action: persistent_notification.create
+    data:
+      title: Renpho cloud measurement
+      message: "New weight: {{ trigger.to_state.attributes.get('weight') }} kg"
+mode: queued
+```
+
+### Reassign a reading
+
+Run this action in Developer Tools → Actions, or use it as an automation action. Replace both IDs with those of your scale and person:
+
+```yaml
+action: renpho.reassign_last_measurement
+data:
+  config_entry_id: YOUR_BLUETOOTH_ENTRY_ID
+  profile_id: YOUR_PERSON_SUBENTRY_ID
+```
+
+## Device changes and Repairs
+
+Rediscovery refreshes model information for a known Bluetooth address. Bluetooth addresses identify the hardware; changing the scale means adding a new entry. Cloud setup contains only account credentials; password changes use reauthentication. Edit a Bluetooth person's details through their subentry's reconfigure menu. These operations preserve entity unique IDs.
+
+The cloud does not provide a guaranteed complete device inventory, so the integration does not automatically delete absent people. After a successful refresh that no longer includes a person's readings, their stale device can be deleted from its device page. Removal is refused during a failed cloud refresh or while that person still supplies readings. If they appear again in a later update, their entities are added again. Remove a Bluetooth person through the person subentry; remove the physical scale through its integration entry.
+
+If Home Assistant hears a scale but has no adapter capable of connecting to it, a Repair explains how to add or move a Bluetooth adapter/proxy and enable active connections. It clears after a successful connection and is removed when the entry is deleted. Temporary connection errors stay in the connection diagnostic; invalid cloud credentials use Home Assistant's reauthentication prompt.

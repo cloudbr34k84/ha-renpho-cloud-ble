@@ -7,11 +7,10 @@ import logging
 import re
 from typing import Any
 
-import voluptuous as vol
+import probatio as vol
 
 from homeassistant.components import bluetooth
 from homeassistant.config_entries import (
-    ConfigEntry,
     ConfigEntryState,
     ConfigFlow,
     ConfigFlowResult,
@@ -26,6 +25,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import ble_protocol as proto
 from .ble_scale import WRITES_ALWAYS, WRITES_AUTO, WRITES_NEVER
+from .coordinator import RenphoConfigEntry
 from .cloud_api import RenphoAuthError, RenphoCloud, RenphoCloudError
 from .const import (
     ALGO_ALT,
@@ -40,15 +40,12 @@ from .const import (
     CONF_MODEL_ID,
     CONF_NAME,
     CONF_PROFILE_BYTE,
-    CONF_SCAN_INTERVAL,
     CONF_SEX,
     CONF_SOURCE,
     CONF_START_WEIGHT,
     CONF_TOLERANCE,
-    DEFAULT_SCAN_INTERVAL_MIN,
     DEFAULT_TOLERANCE_KG,
     DOMAIN,
-    MIN_SCAN_INTERVAL_MIN,
     SEX_FEMALE,
     SEX_MALE,
     SOURCE_BLE,
@@ -60,8 +57,8 @@ _LOGGER = logging.getLogger(__name__)
 
 CLOUD_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_EMAIL): selector.TextSelector(selector.TextSelectorConfig(type="email")),
-        vol.Required(CONF_PASSWORD): selector.TextSelector(selector.TextSelectorConfig(type="password")),
+        vol.Required(CONF_EMAIL): selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.EMAIL)),
+        vol.Required(CONF_PASSWORD): selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)),
     }
 )
 
@@ -76,17 +73,17 @@ class RenphoConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._error_detail = ""
         self._discovered: dict[str, int] = {}
-        self._address: str | None = None
+        self._address: str = ""
         self._model_id: int | None = None
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+    def async_get_options_flow(config_entry: RenphoConfigEntry) -> OptionsFlow:
         return RenphoOptionsFlow()
 
     @classmethod
     @callback
-    def async_get_supported_subentry_types(cls, config_entry: ConfigEntry) -> dict[str, type[ConfigSubentryFlow]]:
+    def async_get_supported_subentry_types(cls, config_entry: RenphoConfigEntry) -> dict[str, type[ConfigSubentryFlow]]:
         if config_entry.data.get(CONF_SOURCE) == SOURCE_BLE:
             return {SUBENTRY_PROFILE: ProfileSubentryFlow}
         return {}
@@ -117,6 +114,7 @@ class RenphoConfigFlow(ConfigFlow, domain=DOMAIN):
             if error:
                 errors["base"] = error
             else:
+                assert api is not None
                 await self.async_set_unique_id(f"cloud_{api.user_id}")
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
@@ -137,13 +135,16 @@ class RenphoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_reauth_confirm(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
-        entry = self._get_reauth_entry()
+        entry: RenphoConfigEntry = self._get_reauth_entry()
         if user_input is not None:
             data = {**entry.data, **user_input}
-            error, _ = await self._validate_cloud(data)
+            error, api = await self._validate_cloud(data)
             if error:
                 errors["base"] = error
             else:
+                assert api is not None
+                if f"cloud_{api.user_id}" != entry.unique_id:
+                    return self.async_abort(reason="wrong_account")
                 self.hass.config_entries.async_update_entry(entry, data=data)
                 if entry.state is not ConfigEntryState.LOADED:
                     # Failed setup leaves no update listener to do the reload
@@ -151,7 +152,10 @@ class RenphoConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self.async_abort(reason="reauth_successful")
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): CLOUD_SCHEMA.schema[CONF_PASSWORD]}),
+            data_schema=vol.Schema({
+                vol.Optional(CONF_EMAIL, default=user_input.get(CONF_EMAIL, entry.data[CONF_EMAIL]) if user_input else entry.data[CONF_EMAIL]): CLOUD_SCHEMA.schema[CONF_EMAIL],
+                vol.Required(CONF_PASSWORD): CLOUD_SCHEMA.schema[CONF_PASSWORD],
+            }),
             errors=errors,
             description_placeholders={"detail": self._error_detail},
         )
@@ -163,7 +167,7 @@ class RenphoConfigFlow(ConfigFlow, domain=DOMAIN):
         if advert is None:
             return self.async_abort(reason="not_supported")
         await self.async_set_unique_id(discovery_info.address.upper())
-        self._abort_if_unique_id_configured()
+        self._abort_if_unique_id_configured(updates={CONF_MODEL_ID: advert.model_id}, reload_on_update=False)
         self._address = discovery_info.address.upper()
         self._model_id = advert.model_id
         self.context["title_placeholders"] = {"name": _scale_title(advert.model_id, self._address)}
@@ -182,7 +186,7 @@ class RenphoConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._address = user_input[CONF_ADDRESS].upper()
             self._model_id = self._discovered.get(self._address)
-            await self.async_set_unique_id(self._address)
+            await self.async_set_unique_id(self._address, raise_on_progress=False)
             self._abort_if_unique_id_configured()
             return self._create_scale()
         configured = self._async_current_ids(include_ignore=False)
@@ -215,18 +219,14 @@ class RenphoConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class RenphoOptionsFlow(OptionsFlow):
+    config_entry: RenphoConfigEntry
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(data=user_input)
         opts = self.config_entry.options
         if self.config_entry.data.get(CONF_SOURCE) == SOURCE_CLOUD:
-            schema = vol.Schema(
-                {
-                    vol.Required(CONF_SCAN_INTERVAL, default=opts.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_MIN)): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=MIN_SCAN_INTERVAL_MIN, max=1440, step=5, unit_of_measurement="min", mode="box")
-                    ),
-                }
-            )
+            schema = vol.Schema({})
         else:
             schema = vol.Schema(
                 {
@@ -248,13 +248,13 @@ def _profile_schema(d: Mapping[str, Any]) -> vol.Schema:
             ),
             vol.Required(CONF_BIRTHDAY, default=d.get(CONF_BIRTHDAY, vol.UNDEFINED)): selector.DateSelector(),
             vol.Required(CONF_HEIGHT_CM, default=d.get(CONF_HEIGHT_CM, vol.UNDEFINED)): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=50, max=250, step=0.5, unit_of_measurement="cm", mode="box")
+                selector.NumberSelectorConfig(min=50, max=250, step=0.5, unit_of_measurement="cm", mode=selector.NumberSelectorMode.BOX)
             ),
             vol.Required(CONF_START_WEIGHT, default=d.get(CONF_START_WEIGHT, vol.UNDEFINED)): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=10, max=300, step=0.1, unit_of_measurement="kg", mode="box")
+                selector.NumberSelectorConfig(min=10, max=300, step=0.1, unit_of_measurement="kg", mode=selector.NumberSelectorMode.BOX)
             ),
             vol.Required(CONF_TOLERANCE, default=d.get(CONF_TOLERANCE, DEFAULT_TOLERANCE_KG)): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=0.5, max=15, step=0.5, unit_of_measurement="kg", mode="box")
+                selector.NumberSelectorConfig(min=0.5, max=15, step=0.5, unit_of_measurement="kg", mode=selector.NumberSelectorMode.BOX)
             ),
             vol.Required(CONF_ALGORITHM, default=d.get(CONF_ALGORITHM, ALGO_DEFAULT)): selector.SelectSelector(
                 selector.SelectSelectorConfig(options=[ALGO_DEFAULT, ALGO_ALT], translation_key=CONF_ALGORITHM)

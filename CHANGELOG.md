@@ -4,6 +4,39 @@ All notable changes to the Renpho (Cloud + Bluetooth) Home Assistant integration
 
 ---
 
+## [v0.2.0] - 2026-11-09
+
+### Added
+
+- A complete 54-rule quality-scale assessment and linked evidence in `QUALITY_AUDIT.md`, with the integration's repository quality target set to Platinum.
+- Strict mypy checks and 100% statement coverage gates for every integration module; config flows additionally require 100% branch coverage.
+- An actionable Repair when no connectable Bluetooth adapter/proxy can reach a scale.
+- Safe stale-device removal and automatic recreation of cloud people/entities when they return.
+- Setup-field and option references, automation examples, update timing, support limitations, and removal instructions.
+
+### Changed
+
+- **Cloud polling now uses a fixed 30-minute default.** Existing `scan_interval` options no longer change it. For a custom schedule, disable automatic polling in the entry's system options and use an automation calling `homeassistant.update_entity` on a cloud sensor.
+- Bluetooth measurements become unavailable after transport failures and recover after a successful connection. Normal scale sleep preserves historical readings; the connection diagnostic remains visible.
+- Downloadable diagnostics redact opaque BLE payloads, identifying GATT values and free-form error text while keeping safe debugging structure and measurement values.
+- RSSI and raw impedance diagnostics are disabled by default for new entities; existing user enable/disable choices are retained.
+- Device metadata refreshes after Bluetooth connections. Cloud people and local profiles use service device types, with explicit parent links for profiles.
+
+### Fixed
+
+- Actions now report missing readings, invalid/unloaded entry targets, missing recorder support, and cloud/storage failures clearly.
+- Unloading awaits BLE task cancellation, disconnects clients and cancels timers; failed platform setup cleans up subscriptions.
+- Reauthentication accepts a changed email for the same account, preserves it across validation errors and rejects accidental account changes.
+- Family endpoint authentication/rate-limit errors propagate correctly. Invalid JSON, ciphertext and login response shapes become recoverable cloud errors.
+- Rediscovery refreshes model information and reloads a loaded entry only once.
+- An invalid stored measurement timestamp no longer prevents a new reading from being recorded.
+
+### Validation
+
+- 164 tests pass, with 100% statement coverage across all 14 integration modules.
+- Config-flow statement and branch coverage are both 100%; strict mypy passes.
+- Hardware support remains at the verification levels documented in README; local MorphoScan support remains experimental.
+
 ## [v0.1.0] - 2026-10-24
 
 First release: one integration for Renpho scales with two independent sources, the Renpho Health cloud and local Bluetooth.

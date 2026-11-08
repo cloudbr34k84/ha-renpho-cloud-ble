@@ -1,0 +1,168 @@
+# Assessment against the supplied quality-scale reference.
+rules:
+  # Bronze
+  appropriate-polling:
+    status: done
+    comment: Cloud checks every 30 minutes; BLE uses advertisements and notifications.
+  brands:
+    status: done
+    comment: Renpho icons exist in home-assistant/brands/custom_integrations/renpho. Upstream requires icon fallback when logo and icon are identical. The integration also bundles 256px and 512px RGBA icon/logo assets in brand/.
+  action-setup:
+    status: done
+    comment: Actions register in async_setup; the shared service helper rejects missing, foreign and unloaded entries.
+  common-modules:
+    status: done
+    comment: Coordinator in coordinator.py; shared entity classes and identity helpers in entity.py.
+  config-flow:
+    status: done
+    comment: UI cloud login, Bluetooth selection/discovery, person subentries and options; translated field descriptions.
+  config-flow-test-coverage:
+    status: done
+    comment: CI requires 100% statement and branch coverage of config_flow.py, including subentries, options, duplicates and recovery from authentication/connection errors.
+  dependency-transparency:
+    status: done
+    comment: No third-party runtime requirements; protocol implementations are included under the documented open-source notices.
+  docs-actions:
+    status: done
+    comment: README Action reference and services.yaml describe both actions and their required fields.
+  docs-conditions:
+    status: exempt
+    comment: The integration provides no custom conditions or device triggers; measurement events are documented in README.
+  docs-high-level-description:
+    status: done
+    comment: README describes Renpho Health cloud and local Bluetooth scales.
+  docs-installation-instructions:
+    status: done
+    comment: README Installation and cloud/Bluetooth setup sections include prerequisites.
+  docs-removal-instructions:
+    status: done
+    comment: README Removing the integration documents entry deletion, files and retained recorder data.
+  docs-triggers:
+    status: exempt
+    comment: The integration provides no custom conditions or device triggers; measurement events are documented in README.
+  entity-event-setup:
+    status: done
+    comment: BLE entities subscribe in async_added_to_hass with async_on_remove; CoordinatorEntity owns cloud subscriptions.
+  entity-unique-id:
+    status: done
+    comment: Cloud IDs include account, person and metric; BLE IDs include scale address, profile and metric.
+  has-entity-name:
+    status: done
+    comment: All cloud and Bluetooth entity classes inherit has_entity_name=True.
+  runtime-data:
+    status: done
+    comment: Typed RenphoConfigEntry stores its coordinator or scale in entry.runtime_data.
+  test-before-configure:
+    status: done
+    comment: Cloud credentials are checked with login; BLE devices are discovered and parsed from real advertisements without user connection details.
+  test-before-setup:
+    status: done
+    comment: Cloud uses async_config_entry_first_refresh; battery-powered BLE scales start listening while asleep and receive device data when awake.
+  unique-config-entry:
+    status: done
+    comment: Cloud account IDs and uppercase Bluetooth addresses reject duplicates.
+  # Silver
+  action-exceptions:
+    status: done
+    comment: Actions reject invalid targets, profiles, missing readings and missing recorder support with ServiceValidationError; cloud/storage import errors raise HomeAssistantError.
+  config-entry-unloading:
+    status: done
+    comment: Platforms unload and entry listeners/background tasks are removed. BLE stop cancels and awaits session/auxiliary tasks, cancels timers, disconnects and saves state; failed platform setup also cleans up.
+  docs-configuration-parameters:
+    status: done
+    comment: README Setup fields and options describes every Bluetooth option, values and defaults; cloud uses standard Home Assistant polling controls. Documentation is maintained in this custom integration repository.
+  docs-installation-parameters:
+    status: done
+    comment: README Setup fields and options describes cloud credentials, Bluetooth selection and every person-subentry field, including how to find the optional profile byte.
+  entity-unavailable:
+    status: done
+    comment: CoordinatorEntity handles cloud failures and missing metrics stay unknown. BLE transport failures mark readings unavailable until recovery, while the connection diagnostic remains visible; normal scale sleep preserves historical readings.
+  integration-owner:
+    status: done
+    comment: The manifest and .github/CODEOWNERS name @cloudbr34k84 as integration owner.
+  log-when-unavailable:
+    status: done
+    comment: The cloud coordinator logs loss/recovery transitions. BLE logs one info message on transport failure and one on recovery, with repeated failures suppressed.
+  parallel-updates:
+    status: done
+    comment: Both sensor.py and event.py explicitly set PARALLEL_UPDATES=0 for read-only entities fed by the coordinator or dispatcher.
+  reauthentication-flow:
+    status: done
+    comment: Cloud authentication failures start a credential flow for the current email and password, validate account identity, update the existing entry and reload it once. Changed emails and error recovery are tested; BLE has no credentials.
+  test-coverage:
+    status: done
+    comment: Every statement in all 14 integration modules is covered by the passing test suite. CI requires 100% statement coverage in every module using scripts/check_module_coverage.py; config flows separately require 100% statements and branches.
+  # Gold
+  devices:
+    status: done
+    comment: Physical BLE scales have Bluetooth identity, model/model ID and firmware refreshed after connecting. Cloud people and local profiles are service devices. Parent links use via_device_id.
+  diagnostics:
+    status: done
+    comment: Downloadable diagnostics redact credentials, names, profile details, serials, opaque payload bytes and exception text while retaining command/timing structure and explicit measurement data. Privacy and non-mutation are tested.
+  discovery:
+    status: done
+    comment: Manifest Bluetooth matching and confirmation/manual discovery flows support LeFu advertisements. Manual setup can complete while a discovery flow is pending; cloud accounts cannot be discovered.
+  discovery-update-info:
+    status: done
+    comment: BLE uses a stable hardware MAC with no mutable host or IP setting. Rediscovery matches that identity and refreshes model information; Bluetooth adapter/proxy routing is resolved at runtime.
+  docs-data-update:
+    status: done
+    comment: README Data updates explains cloud polling, wake-triggered checks, history pagination, rate-limit backoff and pushed BLE notifications.
+  docs-examples:
+    status: done
+    comment: README Use cases and automation examples includes usable local/cloud weigh-in automations and a reassignment action example.
+  docs-known-limitations:
+    status: done
+    comment: README Known limitations covers experimental local support, single BLE connections, cloud upload latency, profile matching and unsupported account control.
+  docs-supported-devices:
+    status: done
+    comment: README Status and Supported and unsupported devices distinguish protocol/capture tests from hardware verification and list incompatible protocols/account sign-in modes.
+  docs-supported-functions:
+    status: done
+    comment: README Entities and Action reference describe sensors, event entities, goals, statistics history, diagnostics and both actions by source and device family.
+  docs-troubleshooting:
+    status: done
+    comment: README Troubleshooting, Recovery and Device changes and Repairs give symptom-specific steps for connections, profile matching, incomplete analysis, credentials and rate limits.
+  docs-use-cases:
+    status: done
+    comment: README explains immediate local weigh-ins, uploaded measurement events, family dashboards, goals and long-term cloud history.
+  dynamic-devices:
+    status: done
+    comment: Coordinator listeners create new cloud people and optional metrics without reloading. Removed entities are forgotten so people that return can be added again; lifecycle tests cover this.
+  entity-category:
+    status: done
+    comment: Battery, connection status, RSSI and impedance diagnostics have diagnostic categories. Primary measurement, goal and event entities retain the default category.
+  entity-device-class:
+    status: done
+    comment: Weight, distance, timestamps, dates, battery, signal strength and enum statuses use matching device classes. Composition ratios, kcal/day BMR and heart rate have no suitable sensor class in the supported HA API.
+  entity-disabled-by-default:
+    status: done
+    comment: RSSI and raw impedance diagnostics are disabled by default; measurements and the connection diagnostic remain available. Existing user registry choices are preserved.
+  entity-translations:
+    status: done
+    comment: Every sensor descriptor and the Measurement event obtain names through translation keys in strings.json, verified by tests.
+  exception-translations:
+    status: done
+    comment: Action errors and coordinator update/authentication/rate-limit exceptions use translation_domain and translation_key with matching exceptions strings and placeholders.
+  icon-translations:
+    status: done
+    comment: Custom icons are declared in icons.json and keyed by entity translation keys. Sensor descriptions do not hardcode icons; device classes provide default icons.
+  reconfiguration-flow:
+    status: exempt
+    comment: Cloud setup contains only account credentials handled by reauthentication. Changing the stable Bluetooth hardware identity requires a new entry. Person subentries already support reconfiguration.
+  repair-issues:
+    status: done
+    comment: An entry-scoped Repair explains how to fix a missing connectable Bluetooth adapter/proxy. It survives unload, clears on successful connection and is deleted when the entry is removed. Authentication uses HA reauthentication.
+  stale-devices:
+    status: done
+    comment: Manual removal is allowed only for cloud people absent from a successful latest-measurement update, or orphaned BLE profiles. Active devices and uncertain failed cloud updates are protected; returning people are recreated.
+  # Platinum
+  async-dependency:
+    status: done
+    comment: Bundled cloud/BLE clients use aiohttp, Bleak and HA asynchronous storage/event APIs. Device and service I/O is awaited directly without blocking libraries or executor adapters.
+  inject-websession:
+    status: done
+    comment: RenphoCloud requires an injected aiohttp ClientSession; setup and config flows pass async_get_clientsession(hass). Tests verify shared session identity and that unload does not close HA-owned sessions.
+  strict-typing:
+    status: done
+    comment: All 14 modules pass mypy strict mode. This standalone custom repository lists custom_components.renpho.* in .strict-typing and enforces its namespace through pyproject.toml and CI. Bundled code ships py.typed; HA-provided I/O dependencies also ship typing markers. Config entry points, coordinator, options and BLE runtime use RenphoConfigEntry.

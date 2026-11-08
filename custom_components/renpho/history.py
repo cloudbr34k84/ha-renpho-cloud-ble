@@ -23,7 +23,7 @@ from homeassistant.components.recorder.statistics import (
     STATISTIC_UNIT_TO_UNIT_CONVERTER,
     async_import_statistics,
 )
-from homeassistant.components.sensor import UNIT_CONVERTERS
+from homeassistant.components.sensor.const import UNIT_CONVERTERS
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
@@ -32,7 +32,8 @@ from homeassistant.util import dt as dt_util
 from .cloud_api import _ts
 from .const import DOMAIN
 from .coordinator import RenphoCloudCoordinator
-from .sensor import ALL_CLOUD_SENSORS, RenphoSensorDescription, cloud_unique_id
+from .sensor import ALL_CLOUD_SENSORS, RenphoSensorDescription
+from .entity import cloud_unique_id
 
 _LOGGER = logging.getLogger(__name__)
 STORE_VERSION = 1
@@ -54,7 +55,7 @@ class CloudHistory:
         self.hass = hass
         self.coordinator = coordinator
         entry = coordinator.config_entry
-        self._store: Store = Store(hass, STORE_VERSION, f"{DOMAIN}.history.{entry.entry_id}")
+        self._store: Store[dict[str, dict[str, int]]] = Store(hass, STORE_VERSION, f"{DOMAIN}.history.{entry.entry_id}")
         self._progress: dict[str, int] | None = None  # statistic_id -> newest imported timestamp
         self._lock = asyncio.Lock()
 
@@ -93,7 +94,7 @@ class CloudHistory:
     def _targets(self) -> list[tuple[str, str, RenphoSensorDescription]]:
         registry = er.async_get(self.hass)
         entry = self.coordinator.config_entry
-        out = []
+        out: list[tuple[str, str, RenphoSensorDescription]] = []
         for uid in (self.coordinator.data or {}).get("latest", {}):
             for desc in ALL_CLOUD_SENSORS:
                 if not desc.history or desc.state_class is None:
@@ -102,7 +103,7 @@ class CloudHistory:
                 entity = registry.async_get(entity_id) if entity_id else None
                 if entity is None or entity.disabled:
                     continue
-                out.append((entity_id, uid, desc))
+                out.append((entity.entity_id, uid, desc))
         return out
 
     def _import(self, stat_id: str, desc: RenphoSensorDescription, records: list[dict[str, Any]]) -> int:

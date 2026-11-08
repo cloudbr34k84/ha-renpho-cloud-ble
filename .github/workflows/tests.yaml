@@ -23,5 +23,13 @@ jobs:
           python scripts/ha_component_requirements.py > /tmp/ha_component_requirements.txt
           pip install -r /tmp/ha_component_requirements.txt
 
-      - name: Run tests
-        run: pytest tests/ -v --tb=short
+      - name: Platinum strict typing
+        run: python -m mypy
+
+      - name: Bronze config flow coverage
+        run: pytest tests/test_config_flow.py --cov=custom_components.renpho.config_flow --cov-branch --cov-report=term-missing --cov-fail-under=100
+
+      - name: Full integration coverage
+        run: |
+          pytest tests/ -v --tb=short --cov=custom_components.renpho --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=100
+          python scripts/check_module_coverage.py coverage.json

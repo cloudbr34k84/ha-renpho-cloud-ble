@@ -55,7 +55,7 @@ PREFIX_MSC = 0x0012
 
 
 def model_name(model_id: int | None) -> str:
-    return _MODEL_NAMES.get(model_id, "Scale")
+    return _MODEL_NAMES.get(model_id, "Scale") if model_id is not None else "Scale"
 
 
 def family(advert: Advert | None) -> str:

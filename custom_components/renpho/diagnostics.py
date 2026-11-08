@@ -20,6 +20,7 @@ from .coordinator import RenphoConfigEntry
 TO_REDACT_CLOUD = {
     CONF_EMAIL, CONF_PASSWORD, "token", "accountName", "email", "mac", "sn", "serialNumber",
     "deviceId", "userId", "userIds", "bUserId", "nickName", "name",
+    "firstName", "lastName", "birthday", "birthDate", "height", "height_cm", "macAddress",
 }
 TO_REDACT_BLE = {"profile"}
 
@@ -36,6 +37,21 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: RenphoC
         ble = async_redact_data(scale.diagnostics(), TO_REDACT_BLE)
         ble["address"] = _mask_mac(ble["address"])
         ble["source"] = _mask_mac(ble["source"])
+        # Opaque bytes and exception messages can contain identifiers or profile data.
+        # Preserve structure, commands and timings without publishing unknown contents.
+        ble["last_error"] = "[redacted]" if ble["last_error"] else None
+        ble["subscriptions"] = {key: "ok" if value == "ok" else "error" for key, value in ble["subscriptions"].items()}
+        for row in ble["raw_log"]:
+            row["hex"] = "[redacted]"
+        for row in ble["frame_log"]:
+            row["payload"] = "[redacted]"
+        for row in ble["writes"]:
+            row.pop("hex", None)
+            row["result"] = "ok" if row["result"] == "ok" else "error"
+        for service in ble["gatt_table"]:
+            for char in service["characteristics"]:
+                if char["uuid"] not in {"00002a19-0000-1000-8000-00805f9b34fb", "00002a26-0000-1000-8000-00805f9b34fb"}:
+                    char.pop("value", None)
         return {
             "options": dict(entry.options),
             # Matching settings only — no names, birthdays or heights
@@ -52,7 +68,7 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: RenphoC
         "entry": async_redact_data(dict(entry.data), TO_REDACT_CLOUD),
         "options": dict(entry.options),
         "last_update_success": coordinator.last_update_success,
-        "last_exception": repr(coordinator.last_exception) if coordinator.last_exception else None,
+        "last_exception": type(coordinator.last_exception).__name__ if coordinator.last_exception else None,
         "user_count": len(data.get("users", {})),
         "scales": async_redact_data(data.get("scales", []), TO_REDACT_CLOUD),
         "latest_keys": [sorted(r) for r in data.get("latest", {}).values()],

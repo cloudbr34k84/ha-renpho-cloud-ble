@@ -14,8 +14,8 @@ Two protocol families (see ble_protocol):
   the matched person (their profile byte, answered before completion, BMI
   consistent with their height).
 
-Every notification on every characteristic is also kept in a ring buffer for
-diagnostics, so unknown models can be worked out from real data.
+Every notification is kept in a runtime ring buffer and can be logged at debug
+level. Downloadable diagnostics redact opaque payload bytes.
 """
 
 from __future__ import annotations
@@ -24,14 +24,15 @@ import asyncio
 from collections import deque
 from datetime import date, datetime, timedelta
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
+from collections.abc import Callable, Mapping
 
 from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
 
 from homeassistant.components import bluetooth
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers import device_registry as dr, issue_registry as ir
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later
@@ -50,6 +51,7 @@ from .const import (
     CONF_CAPTURE,
     CONF_HEIGHT_CM,
     CONF_NAME,
+    CONF_MODEL_ID,
     CONF_PROFILE_BYTE,
     CONF_SEX,
     CONF_SOURCE,
@@ -62,6 +64,9 @@ from .const import (
     SOURCE_CLOUD,
     SUBENTRY_PROFILE,
 )
+
+if TYPE_CHECKING:
+    from .coordinator import RenphoConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,15 +95,16 @@ WRITES_ALWAYS = "always"
 class RenphoBleScale:
     """Owns the advertisement subscription and GATT sessions for one scale."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant, entry: RenphoConfigEntry) -> None:
         self.hass = hass
         self.entry = entry
         self.address: str = entry.data[CONF_ADDRESS].upper()
-        self._store: Store = Store(hass, STORE_VERSION, f"{DOMAIN}.{entry.entry_id}")
+        self._store: Store[dict[str, Any]] = Store(hass, STORE_VERSION, f"{DOMAIN}.{entry.entry_id}")
         self.scale: dict[str, Any] = {}
         self.profiles: dict[str, dict[str, Any]] = {}
         self.status = "idle"
         self.last_error: str | None = None
+        self.connection_available = True
         self.advert: proto.Advert | None = None
         self.rssi: int | None = None
         self.last_seen: datetime | None = None
@@ -112,11 +118,11 @@ class RenphoBleScale:
         self.writes: deque[dict[str, Any]] = deque(maxlen=50)
         self.history_records = 0
         self.sessions = 0
-        self._task: asyncio.Task | None = None
+        self._task: asyncio.Task[None] | None = None
         self._cooldown_until: datetime = dt_util.utcnow()
         self._last_adv_notify: datetime = datetime.min.replace(tzinfo=dt_util.UTC)
-        self._unsub: list = []
-        self._cloud_timers: list = []
+        self._unsub: list[Callable[[], None]] = []
+        self._cloud_timers: list[Callable[[], None]] = []
         # per-session state
         self._buffers: dict[str, bytearray] = {}
         self._done = asyncio.Event()
@@ -124,12 +130,12 @@ class RenphoBleScale:
         self._plateau: float | None = None
         self._last_settling: float | None = None
         self._run = 0
-        self._profile_task: asyncio.Task | None = None
+        self._profile_task: asyncio.Task[None] | None = None
         self._profile_sent_for: str | None = None
         self._cmd_char: BleakGATTCharacteristic | None = None
         self._client: BleakClient | None = None
         self._write_lock = asyncio.Lock()
-        self._tasks: set[asyncio.Task] = set()
+        self._tasks: set[asyncio.Task[None] | asyncio.Task[bool]] = set()
         # MorphoScan family
         self._msc_seq = 0
         self._msc_state: int | None = None
@@ -138,11 +144,11 @@ class RenphoBleScale:
         self._msc_profile: dict[str, Any] | None = None
         self._msc_reprofiled = False
         self._msc_record: proto.MscRecord | None = None
-        self._hold_task: asyncio.Task | None = None
+        self._hold_task: asyncio.Task[None] | None = None
 
     # ---------------------------------------------------------------- setup
     @property
-    def options(self) -> dict[str, Any]:
+    def options(self) -> Mapping[str, Any]:
         return self.entry.options
 
     @property
@@ -160,6 +166,14 @@ class RenphoBleScale:
         self.profiles = {
             sid: data for sid, data in stored.get("profiles", {}).items() if sid in self.entry.subentries
         }
+        self.device_id = dr.async_get(self.hass).async_get_or_create(
+            config_entry_id=self.entry.entry_id,
+            identifiers={(DOMAIN, self.address)},
+            connections={(dr.CONNECTION_BLUETOOTH, self.address)},
+            name=f"Renpho {proto.model_name(self.entry.data.get(CONF_MODEL_ID))}",
+            manufacturer="Renpho", model=proto.model_name(self.entry.data.get(CONF_MODEL_ID)),
+            sw_version=self.scale.get("firmware"),
+        ).id
         self._unsub.append(
             bluetooth.async_register_callback(
                 self.hass,
@@ -174,11 +188,21 @@ class RenphoBleScale:
         for unsub in self._unsub:
             unsub()
         self._unsub.clear()
-        if self._task:
-            self._task.cancel()
+        tasks = {task for task in (self._task, self._profile_task, self._hold_task, *self._tasks) if task}
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._tasks.clear()
         if self._client and self._client.is_connected:
             await self._client.disconnect()
         await self._store.async_save(self._snapshot())
+
+    def _set_connection_available(self, available: bool) -> None:
+        """Log only availability transitions; sleeping after a reading is normal."""
+        if self.connection_available != available:
+            _LOGGER.info("Renpho %s is %s", self.address, "available again" if available else "unavailable")
+            self.connection_available = available
 
     def _snapshot(self) -> dict[str, Any]:
         return {"scale": self.scale, "profiles": self.profiles}
@@ -260,6 +284,14 @@ class RenphoBleScale:
         try:
             device = bluetooth.async_ble_device_from_address(self.hass, self.address, connectable=True)
             if device is None:
+                ir.async_create_issue(
+                    self.hass, DOMAIN, f"no_adapter_{self.entry.entry_id}",
+                    is_fixable=False, severity=ir.IssueSeverity.WARNING,
+                    translation_key="no_connectable_adapter",
+                    translation_placeholders={"entry": self.entry.title},
+                    data={"entry_id": self.entry.entry_id},
+                )
+                self._set_connection_available(False)
                 self.status = "no_connectable_adapter"
                 self.last_error = "No connectable adapter/proxy can reach the scale"
                 return
@@ -275,6 +307,8 @@ class RenphoBleScale:
             )
             self._client = client
             self.sessions += 1
+            ir.async_delete_issue(self.hass, DOMAIN, f"no_adapter_{self.entry.entry_id}")
+            self._set_connection_available(True)
             self.status = "connected"
             self.last_error = None
             self._notify()
@@ -296,6 +330,7 @@ class RenphoBleScale:
         except asyncio.CancelledError:
             raise
         except Exception as err:  # noqa: BLE001 - BLE stacks raise anything
+            self._set_connection_available(False)
             self.status = "error"
             self.last_error = f"{type(err).__name__}: {err}"
             _LOGGER.debug("Renpho %s session failed", self.address, exc_info=True)
@@ -352,6 +387,14 @@ class RenphoBleScale:
                 continue
             self.scale[key] = value[0] if key == "battery" and value else value.decode(errors="replace").strip("\x00 ")
 
+        if device := dr.async_get(self.hass).async_get_device_by_identifier((DOMAIN, self.address), self.entry.entry_id):
+            mid = self.model_id or self.entry.data.get(CONF_MODEL_ID)
+            dr.async_get(self.hass).async_update_device(
+                device.id, model=proto.model_name(mid),
+                model_id=f"0x{mid:04x}" if mid is not None else None,
+                sw_version=self.scale.get("firmware"),
+            )
+
         # GATT table for diagnostics; readable values are fetched once per HA run
         read_values = capture and not self.gatt_table
         known = {
@@ -382,7 +425,7 @@ class RenphoBleScale:
                 self.address,
             )
 
-    def _make_handler(self, uuid: str, is_main: bool):
+    def _make_handler(self, uuid: str, is_main: bool) -> Callable[[BleakGATTCharacteristic, bytearray], None]:
         def handler(_char: BleakGATTCharacteristic, data: bytearray) -> None:
             self.raw_log.append({"t": dt_util.utcnow().isoformat(), "char": uuid[4:8], "hex": data.hex()})
             _LOGGER.debug("Renpho %s %s <- %s", self.address, uuid[4:8], data.hex())
@@ -506,7 +549,7 @@ class RenphoBleScale:
         prof = self._profile_subentries().get(sid) if sid else None
         seq = self._next_seq()
         height = float(prof[CONF_HEIGHT_CM]) if prof else None
-        last_weight = (self.profiles.get(sid, {}).get("weight") or prof.get(CONF_START_WEIGHT)) if prof else None
+        last_weight = (self.profiles.get(sid, {}).get("weight") or prof.get(CONF_START_WEIGHT)) if prof and sid is not None else None
         own_byte = _profile_byte(prof)
         self._msc_profile = {
             "seq": seq,
@@ -563,7 +606,7 @@ class RenphoBleScale:
             # MorphoScan scales need the handshake; extended 0x55aa ones need
             # a guest profile before they release a final
             return self.family == proto.FAMILY_MSC or self.model_id in proto.EXTENDED_MODEL_IDS
-        return mode == WRITES_ALWAYS
+        return bool(mode == WRITES_ALWAYS)
 
     async def _send_profile_after_grace(self) -> None:
         """Extended-flavor scales only release a final once a guest profile is on them."""
@@ -598,7 +641,7 @@ class RenphoBleScale:
         }
 
     def _match_profile(self, weight: float) -> tuple[str | None, dict[str, Any] | None]:
-        best: tuple[float, str, dict] | None = None
+        best: tuple[float, str, dict[str, Any]] | None = None
         for sid, prof in self._profile_subentries().items():
             ref = self.profiles.get(sid, {}).get("weight") or prof.get(CONF_START_WEIGHT)
             if ref is None:
@@ -622,10 +665,11 @@ class RenphoBleScale:
         if reading is None:
             return False
         last = self.scale.get("measured_at")
+        last_time = dt_util.parse_datetime(last) if last else None
         if (
-            last
+            last_time is not None
             and abs(self.scale.get("weight", 0) - reading.weight_kg) < 0.05
-            and dt_util.utcnow() - dt_util.parse_datetime(last) < DUPLICATE_WINDOW
+            and dt_util.utcnow() - last_time < DUPLICATE_WINDOW
         ):
             return True
         self.record_measurement(reading.weight_kg, reading.resistance, method, reading, msc_record=record)
@@ -641,6 +685,8 @@ class RenphoBleScale:
         msc_record: proto.MscRecord | None = None,
     ) -> None:
         now = dt_util.utcnow().isoformat()
+        sid: str | None
+        prof: dict[str, Any] | None
         if force_profile is not None:
             sid, prof = force_profile, self._profile_subentries().get(force_profile)
         else:

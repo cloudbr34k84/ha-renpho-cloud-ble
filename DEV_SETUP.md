@@ -68,3 +68,56 @@ git add .
 git commit -m "your message"
 git push
 ```
+
+## Quality scale checks
+
+The assessment is in `custom_components/renpho/quality_scale.yaml`. Run the
+flow coverage gate with:
+
+```bash
+python -m pytest tests/test_config_flow.py --cov=custom_components.renpho.config_flow --cov-branch --cov-report=term-missing --cov-fail-under=100
+```
+
+Then run `python -m pytest -q` for the full integration suite. The manifest
+must not claim a tier while any Bronze rule is `todo`. Local HACS brand
+assets are included. Upstream Renpho icons provide the logo fallback required
+when the icon and logo are identical; see the brands repository README.
+
+
+Silver requires more than 95% statement coverage in **every** integration
+module. This repository enforces the stronger target of **100% statement
+coverage in every module**:
+
+```bash
+python -m pytest --cov=custom_components.renpho --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=100
+python scripts/check_module_coverage.py coverage.json
+```
+
+CI runs both the 100% config-flow statement/branch gate and the full-integration
+100% statement gate. The module checker rejects any missing module or uncovered
+statement, so rounding cannot hide a gap.
+
+
+## Platinum strict typing
+
+Install the pinned checker from `requirements_test.txt`, then run from the
+repository root:
+
+```bash
+python -m mypy
+```
+
+`pyproject.toml` enables strict mode for every module in
+`custom_components/renpho`. It reads dependency annotations without checking
+third-party implementation bodies (`follow_imports = "silent"`); it does not
+ignore missing imports, suppress integration errors, or disable strict checks.
+`.strict-typing` records this repository's custom-component namespace, and
+`custom_components/renpho/py.typed` declares the bundled clients typed. Core's
+own `.strict-typing` file is maintained in the Home Assistant Core repository;
+this standalone integration enforces the equivalent check in its own CI.
+
+Normalized cloud data uses `CloudData`; variable vendor JSON fields retain
+explicit `Any` values at the API boundary. Config entries, coordinator results,
+BLE tasks, callbacks, options, selectors and storage containers are annotated.
+The cloud client receives Home Assistant's shared aiohttp session rather than
+creating or owning another connection pool.

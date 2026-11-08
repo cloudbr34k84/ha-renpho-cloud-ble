@@ -11,7 +11,8 @@ import base64
 from datetime import UTC, date, datetime
 import json
 import logging
-from typing import Any
+from typing import Any, TypedDict, cast
+from collections.abc import Callable
 
 import aiohttp
 from cryptography.hazmat.primitives import padding
@@ -38,6 +39,16 @@ EP_DEVICES = "renpho-aggregation/device/count"
 EP_FAMILY = "RenphoHealth/centerUser/queryFamilyMemberList"
 EP_MEASUREMENTS = "RenphoHealth/scale/queryAllMeasureDataList"
 EP_BODY_COMP = "RenphoHealth/scale/queryBodyCompositionMeasureData"
+
+
+class CloudData(TypedDict):
+    """Normalized cloud response shared by platforms and history import."""
+
+    users: dict[str, str]
+    scales: list[dict[str, Any]]
+    latest: dict[str, dict[str, Any]]
+    records: list[dict[str, Any]]
+    profiles: dict[str, dict[str, Any]]
 
 
 class RenphoCloudError(Exception):
@@ -69,13 +80,16 @@ def _encrypt(obj: Any) -> dict[str, str]:
 
 
 def _decrypt(b64: str) -> Any:
-    dec = Cipher(algorithms.AES(_KEY), modes.ECB()).decryptor()  # noqa: S305
-    padded = dec.update(base64.b64decode(b64)) + dec.finalize()
-    unpadder = padding.PKCS7(128).unpadder()
-    return json.loads((unpadder.update(padded) + unpadder.finalize()).decode())
+    try:
+        dec = Cipher(algorithms.AES(_KEY), modes.ECB()).decryptor()  # noqa: S305
+        padded = dec.update(base64.b64decode(b64)) + dec.finalize()
+        unpadder = padding.PKCS7(128).unpadder()
+        return json.loads((unpadder.update(padded) + unpadder.finalize()).decode())
+    except (ValueError, TypeError) as err:
+        raise RenphoCloudError("Invalid encrypted response from Renpho") from err
 
 
-def _message(result: dict) -> str:
+def _message(result: dict[str, Any]) -> str:
     """The gateway's error text; current responses put it in ``message``."""
     return result.get("msg") or result.get("message") or ""
 
@@ -101,15 +115,15 @@ def _goal_date(value: Any) -> str | None:
     return None
 
 
-def profile_goals(person: dict, latest_weight: float | None) -> dict[str, Any]:
+def profile_goals(person: dict[str, Any], latest_weight: float | None) -> dict[str, Any]:
     """Goals and body measurements from a login or family-member record, in kg / cm.
 
     Weight units follow the app's codes (1 kg, 2 lb); a height unit other than
     0 means inches, which is assumed for the waist and hip too.
     """
     lb = person.get("weightGoalUnit", person.get("weightUnit")) == 2
-    to_kg = (lambda v: round(v / _LB_PER_KG, 2)) if lb else (lambda v: v)
-    to_cm = (lambda v: round(v * 2.54, 1)) if person.get("heightUnit") not in (None, 0) else (lambda v: v)
+    to_kg: Callable[[float], float] = (lambda v: round(v / _LB_PER_KG, 2)) if lb else (lambda v: v)
+    to_cm: Callable[[float], float] = (lambda v: round(v * 2.54, 1)) if person.get("heightUnit") not in (None, 0) else (lambda v: v)
     goal = _num(person.get("weightGoal")) or _num(person.get("currentGoalWeight"))
     out: dict[str, Any] = {
         "weight_goal": to_kg(goal) if goal else None,
@@ -125,26 +139,26 @@ def profile_goals(person: dict, latest_weight: float | None) -> dict[str, Any]:
     return {k: v for k, v in out.items() if v is not None}
 
 
-def _ts(record: dict) -> int:
+def _ts(record: dict[str, Any]) -> int:
     try:
         return int(record.get("timeStamp") or record.get("time_stamp") or 0)
     except (TypeError, ValueError):
         return 0
 
 
-def _display_name(person: dict) -> str | None:
+def _display_name(person: dict[str, Any]) -> str | None:
     """Best name for a login or family-member record (field names vary by app version)."""
     full = " ".join(p for p in (person.get("firstName"), person.get("lastName")) if p)
     return person.get("nickName") or full or person.get("accountName") or person.get("name") or None
 
 
-def _records(page: Any) -> list[dict]:
+def _records(page: Any) -> list[dict[str, Any]]:
     if isinstance(page, list):
         return page
     if isinstance(page, dict):
         for key in ("list", "data", "records", "measurements"):
             if isinstance(page.get(key), list):
-                return page[key]
+                return cast(list[dict[str, Any]], page[key])
         if "weight" in page:
             return [page]
     return []
@@ -162,7 +176,7 @@ class RenphoCloud:
         self.user_info: dict[str, Any] = {}
         self.family_records: dict[str, dict[str, Any]] = {}
 
-    async def _post(self, endpoint: str, body: dict, *, auth: bool = True) -> dict:
+    async def _post(self, endpoint: str, body: dict[str, Any], *, auth: bool = True) -> dict[str, Any]:
         headers = {"appVersion": APP_VERSION, "platform": PLATFORM}
         if auth and self.token:
             headers |= {"token": self.token, "userId": str(self.user_id)}
@@ -180,12 +194,15 @@ class RenphoCloud:
                         retry_after = 900.0
                     raise RenphoRateLimited(retry_after)
                 resp.raise_for_status()
-                return await resp.json(content_type=None)
-        except (aiohttp.ClientError, TimeoutError) as err:
+                result = await resp.json(content_type=None)
+                if not isinstance(result, dict):
+                    raise RenphoCloudError("Renpho returned a non-object response")
+                return cast(dict[str, Any], result)
+        except (aiohttp.ClientError, TimeoutError, ValueError) as err:
             raise RenphoCloudError(f"{endpoint}: {err}") from err
 
     @staticmethod
-    def _ok(result: dict) -> bool:
+    def _ok(result: dict[str, Any]) -> bool:
         return str(_message(result)).lower() == "success" or result.get("code") in _SUCCESS
 
     async def login(self) -> None:
@@ -207,7 +224,10 @@ class RenphoCloud:
             raise RenphoAuthError(
                 f"login rejected: code={result.get('code')} message={_message(result)}", result.get("code")
             )
-        login = _decrypt(result["data"]).get("login", {})
+        data = _decrypt(result["data"])
+        if not isinstance(data, dict) or not isinstance(data.get("login", {}), dict):
+            raise RenphoCloudError("Renpho returned an invalid login response")
+        login = data.get("login", {})
         self.token = login.get("token")
         self.user_id = str(login.get("id")) if login.get("id") is not None else None
         self.user_info = login
@@ -226,6 +246,8 @@ class RenphoCloud:
         """user_id -> nickname; empty if the endpoint is unavailable."""
         try:
             data = await self._call(EP_FAMILY, {})
+        except (RenphoAuthError, RenphoRateLimited):
+            raise
         except RenphoCloudError:
             _LOGGER.debug("family endpoint unavailable", exc_info=True)
             return {}
@@ -238,14 +260,14 @@ class RenphoCloud:
                 self.family_records[uid] = m
         return out
 
-    async def _pages(self, endpoint: str, table: str, user_id: str, *, everything: bool) -> list[dict]:
+    async def _pages(self, endpoint: str, table: str, user_id: str, *, everything: bool) -> list[dict[str, Any]]:
         """Fetch one person's records from one store.
 
         The sort order isn't documented (the 8-electrode store comes back
         newest-first, the classic one oldest-first), so unless ``everything``
         is asked for, paging stops as soon as the newest record must be in hand.
         """
-        out: list[dict] = []
+        out: list[dict[str, Any]] = []
         for page in range(1, _MAX_PAGES + 1):
             data = await self._call(
                 endpoint,
@@ -259,7 +281,7 @@ class RenphoCloud:
                 break
         return out
 
-    async def latest_measurements(self, *, everything: bool = False) -> dict[str, Any]:
+    async def latest_measurements(self, *, everything: bool = False) -> CloudData:
         """Return ``{"users", "scales", "latest": {uid: record}, "records": [...]}``.
 
         Both record stores are read and merged: classic (4-electrode) records
@@ -293,7 +315,7 @@ class RenphoCloud:
             if uid not in listed and uid.isdigit():
                 targets.append((f"measurements_info_{int(uid) % _TABLE_SHARDS}", uid))
 
-        merged: dict[tuple[str, int, Any], dict] = {}
+        merged: dict[tuple[str, int, Any], dict[str, Any]] = {}
         for table, queried in targets:
             for endpoint in (EP_MEASUREMENTS, EP_BODY_COMP):  # body comp last: it wins on overlap
                 for r in await self._pages(endpoint, table, queried, everything=everything):
@@ -305,7 +327,7 @@ class RenphoCloud:
                     merged[key] = {**merged.get(key, {}), **r, "userId": uid}
 
         records = sorted(merged.values(), key=_ts)
-        latest: dict[str, dict] = {}
+        latest: dict[str, dict[str, Any]] = {}
         for r in records:
             latest[r["userId"]] = r  # oldest first, so the last one wins
             users.setdefault(r["userId"], r["userId"])

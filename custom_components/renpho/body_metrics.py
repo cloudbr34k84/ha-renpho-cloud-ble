@@ -15,7 +15,7 @@ FEMALE = 1
 
 
 def _round(x: float, ndigits: int) -> float:
-    scale = 10**ndigits
+    scale: float = 10**ndigits
     return floor(x * scale + 0.5) / scale
 
 

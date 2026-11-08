@@ -4,3 +4,5 @@ __pycache__/
 .coverage
 # Diagnostics downloads from a live system — keep out of the public repo
 config_entry-*.json
+coverage.json
+.mypy_cache/

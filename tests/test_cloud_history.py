@@ -225,3 +225,18 @@ async def test_heart_rate_dropped_unless_measured(hass: HomeAssistant) -> None:
         await hass.async_block_till_done()
     assert registry.async_get(stale.entity_id) is None  # Alex's scale doesn't measure it
     assert float(hass.states.get("sensor.renpho_cloud_sam_heart_rate").state) == 72
+
+
+async def test_history_no_targets_and_remove_storage(hass, hass_storage):
+    """An empty account has nothing to import and its progress can be removed."""
+    entry = cloud_entry(hass)
+    data = payload([])
+    with patch.object(RenphoCloud, "latest_measurements", AsyncMock(return_value=data)):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    history = entry.runtime_data.history
+    assert await history.async_sync() == 0
+    await history.async_reset()
+    assert await history._store.async_load() == {"progress": {}}
+    await history.async_remove()
+    assert f"renpho.history.{entry.entry_id}" not in hass_storage

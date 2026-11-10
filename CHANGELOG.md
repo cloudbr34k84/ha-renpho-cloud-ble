@@ -4,6 +4,13 @@ All notable changes to the Renpho (Cloud + Bluetooth) Home Assistant integration
 
 ---
 
+## [v0.2.2] - 2026-11-10
+
+### Changed
+
+- Publish a maintenance release of the current HACS-compatible integration.
+- Runtime behavior, configuration and entity identifiers are unchanged from v0.2.1.
+
 ## [v0.2.1] - 2026-11-10
 
 ### Changed

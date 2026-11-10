@@ -1,16 +1,25 @@
 name: Validate with HACS
 
 on:
+  workflow_dispatch:
   push:
   pull_request:
   schedule:
     - cron: "0 0 * * *"
+
+permissions:
+  contents: read
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Check integration packaging
+        run: python scripts/check_hacs_layout.py
       - name: HACS validation
         uses: hacs/action@main
         with:

@@ -34,6 +34,18 @@ ln -s ../brads_dev/ha-renpho-cloud-ble/custom_components/renpho renpho
 | `manifest.json`, new files | Full HA restart |
 | `strings.json` / translations | Full HA restart (keep `translations/en.json` identical to `strings.json`) |
 
+## Checking HACS packaging
+
+Run the dependency-free packaging check from the repository root:
+
+```bash
+python3 scripts/check_hacs_layout.py
+```
+
+CI runs this check before the official HACS validator. It verifies the single
+integration directory, matching manifest domain, required metadata and bundled
+brand/translation files without importing Home Assistant.
+
 ## Running the Tests
 
 ```bash
@@ -121,3 +133,28 @@ explicit `Any` values at the API boundary. Config entries, coordinator results,
 BLE tasks, callbacks, options, selectors and storage containers are annotated.
 The cloud client receives Home Assistant's shared aiohttp session rather than
 creating or owning another connection pool.
+
+## Release versions
+
+Use semantic versions (`MAJOR.MINOR.PATCH`) in
+`custom_components/renpho/manifest.json`, without a `v` prefix. For each release:
+
+1. Update the manifest version and add the matching entry to `CHANGELOG.md`.
+2. Run the packaging check, tests, HACS validation and Hassfest validation.
+3. Date the changelog entry, commit and push the changes, then push a matching tag:
+
+   ```bash
+   git tag -a v0.2.1 -m "Renpho v0.2.1"
+   git push origin v0.2.1
+   ```
+
+The Release workflow checks that the stable tag matches the manifest version,
+extracts the dated changelog entry, runs packaging, HACS and Hassfest validation,
+and publishes the GitHub Release. It uses the built-in `GITHUB_TOKEN`; no extra
+secret is needed. A failed validation prevents publication. To retry, rerun the
+failed workflow or run it manually with the version tag selected. Existing
+releases are preserved on reruns. GitHub supplies the source archives used by
+HACS, so no separate ZIP upload is required.
+
+The minimum supported Home Assistant version is declared in root `hacs.json`;
+keep the README requirement consistent when changing it.

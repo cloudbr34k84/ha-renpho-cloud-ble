@@ -4,6 +4,16 @@ All notable changes to the Renpho (Cloud + Bluetooth) Home Assistant integration
 
 ---
 
+## [v0.2.1] - 2026-11-10
+
+### Changed
+
+- Validate HACS packaging in CI and document the installable integration layout.
+- Refresh HACS metadata and provide step-by-step HACS and manual installation instructions.
+- Allow manual runs of the HACS and Hassfest validation workflows.
+- Publish GitHub releases automatically for matching stable version tags after packaging, HACS and Hassfest validation.
+
+
 ## [v0.2.0] - 2026-11-09
 
 ### Added

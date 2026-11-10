@@ -32,11 +32,45 @@ If your scale isn't decoded locally yet, use the cloud source. It works today fo
 
 ## Installation
 
-**HACS (custom repository):** HACS → ⋮ → *Custom repositories* → add `https://github.com/cloudbr34k84/ha-renpho-cloud-ble` as an *Integration*, install **Renpho (Cloud + Bluetooth)**, then restart Home Assistant.
+### HACS (custom repository)
 
-**Manual:** copy `custom_components/renpho` into your `config/custom_components/` and restart.
+1. Open **HACS** in Home Assistant.
+2. Open the **⋮** menu → **Custom repositories**.
+3. Add `https://github.com/cloudbr34k84/ha-renpho-cloud-ble` with type **Integration**.
+4. Find **Renpho (Cloud + Bluetooth)** in HACS and download it.
+5. Restart Home Assistant, then open **Settings → Devices & services → Add integration → Renpho**.
+
+### Manual installation
+
+1. Download a release from [GitHub Releases](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/releases) and extract it.
+2. Copy `custom_components/renpho/` into your Home Assistant configuration directory as `config/custom_components/renpho/`.
+3. Restart Home Assistant and add **Renpho** from **Settings → Devices & services**.
 
 Requires Home Assistant 2026.10 or newer.
+
+### Repository layout
+
+HACS installs the contents of `custom_components/renpho/` into Home Assistant's
+`config/custom_components/renpho/` directory. Keep the `renpho` folder name: it
+matches the integration's manifest domain.
+
+```text
+ha-renpho-cloud-ble/
+├── hacs.json
+├── README.md
+└── custom_components/
+    └── renpho/
+        ├── __init__.py
+        ├── manifest.json
+        ├── brand/
+        ├── translations/
+        └── ...
+```
+
+`hacs.json` stays at the repository root with `content_in_root: false`.
+Tests, development scripts and documentation stay outside the integration
+folder so HACS only installs runtime files. For a manual installation, copy
+only the `renpho` folder, not the entire repository.
 
 ## Setup
 

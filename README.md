@@ -2,12 +2,31 @@
   <img src="Renpho%20Cloud%20%26%20BLE%20banner.png" alt="Renpho Cloud and BLE for Home Assistant banner" width="100%">
 </p>
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Tests](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/tests.yaml/badge.svg)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/tests.yaml)
-[![Validate with hassfest](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/hassfest.yaml)
-[![Validate with HACS](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/validate.yaml/badge.svg)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/validate.yaml)
-
 # Renpho for Home Assistant — Cloud + Bluetooth
+
+<!-- integration-badges:start -->
+[![Latest release](https://img.shields.io/github/v/release/cloudbr34k84/ha-renpho-cloud-ble)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/releases/latest)
+[![Home Assistant minimum version](https://img.shields.io/badge/Home%20Assistant-2026.10.0%2B-41BDF5?logo=homeassistant)](https://www.home-assistant.io/)
+[![HACS custom repository](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://www.hacs.xyz/docs/faq/custom_repositories/)
+[![License](https://img.shields.io/github/license/cloudbr34k84/ha-renpho-cloud-ble)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/blob/main/LICENSE)
+
+[![Validation](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/validate.yaml/badge.svg?branch=main)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/validate.yaml)
+[![Hassfest](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/hassfest.yaml/badge.svg?branch=main)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/hassfest.yaml)
+[![Tests](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/tests.yaml/badge.svg?branch=main)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/tests.yaml)
+[![Typing: mypy](https://img.shields.io/badge/typing-mypy-blue)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/actions/workflows/tests.yaml)
+
+[![Release asset downloads](https://img.shields.io/github/downloads/cloudbr34k84/ha-renpho-cloud-ble/total?label=release%20asset%20downloads)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/releases)
+[![Last commit](https://img.shields.io/github/last-commit/cloudbr34k84/ha-renpho-cloud-ble/main)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/commits/main/)
+[![Maintained](https://img.shields.io/maintenance/yes/2026)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/commits/main/)
+[![Contributors](https://img.shields.io/github/contributors/cloudbr34k84/ha-renpho-cloud-ble)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/graphs/contributors)
+[![Stars](https://img.shields.io/github/stars/cloudbr34k84/ha-renpho-cloud-ble?style=flat)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/stargazers)
+[![Open issues](https://img.shields.io/github/issues/cloudbr34k84/ha-renpho-cloud-ble)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/issues)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/pulls)
+[![Support: GitHub Issues](https://img.shields.io/badge/support-GitHub%20Issues-181717?logo=github)](https://github.com/cloudbr34k84/ha-renpho-cloud-ble/issues)
+
+[![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=cloudbr34k84&repository=ha-renpho-cloud-ble&category=integration)
+[![Add integration to Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=renpho)
+<!-- integration-badges:end -->
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/cloudbr34k84/ha-renpho-cloud-ble/main/custom_components/renpho/brand/icon@2x.png" alt="Renpho Cloud + Bluetooth for Home Assistant" width="200">
